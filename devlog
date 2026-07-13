@@ -1,0 +1,12 @@
+# Devlog #1
+
+I'm starting with a simple agentic web interface.
+
+For the first release, I want to focus mainly on the user interface and finishing the frontend. The backend will just be a simple API or an Ollama proxy with rate limiting.
+
+I also want to create a custom harness in Python, but not for the first release. I prepared some design files beforehand, but they look bad, so I'm not really following them much.
+
+If I don't mess up the UI, it should come out looking okay, but I'm a bit more worried about the UX. I like putting animations everywhere, which always absolutely ruins UX, so I'll try to be more conservative with them this time.
+
+I'm working on the frontend mostly without AI, using it only as interactive documentation. I'm hoping to get the frontend into a usable asap so I can start working on other features and the custom harness.
+

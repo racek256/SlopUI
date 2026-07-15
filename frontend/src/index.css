@@ -1,4 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
+@plugin "@tailwindcss/typography";
 @import "tailwindcss";
 
 :root {
@@ -60,5 +62,74 @@ body {
 }
 .bg-gradient-active{
 	background-position: 0% 0% !important;
+}
+
+.loading{
+  border-radius: 8px;
+  corner-shape: squircle;
+}
+
+
+.markdown-body p,
+.markdown-body ul,
+.markdown-body ol,
+.markdown-body blockquote {
+  margin: 0.4em 0;
+}
+
+.markdown-body li {
+  margin: 0.15em 0;
+}
+/* Scrollbar */
+
+/* Chrome, Edge, Safari */
+::-webkit-scrollbar {
+  width: 16px;
+}
+
+::-webkit-scrollbar-track {
+  background: #111;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #666;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #888;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #666 #111;
+}
+.roboto{
+  font-family: "Manrope", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+}
+
+
+
+input:focus,
+textarea:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+
+
+.model-selector {
+  anchor-name: --selector;
+}
+
+.model-selector-box {
+  position: absolute;
+  position-anchor: --selector;
+
+  left: anchor(center);
 }
 

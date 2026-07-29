@@ -48,7 +48,7 @@ def chat(conn,user_id, chat_id, content):
             break
 
     last_message = InsertMessage(conn, user_id, chat_id, "assistant", response["content"], json.dump(response["chain"]))
-    SystemExit(conn, user_id, chat_id, last_message)
+    SetCurrentMessage(conn, user_id, chat_id, last_message)
 
     print(response)
 

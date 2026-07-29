@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS users (
+	id INTEGER PRIMARY KEY,
+	username TEXT NOT NULL UNIQUE,
+	password_hash TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS chats (
+	id INTEGER PRIMARY KEY,
+	user_id INTEGER NOT NULL,
+	name TEXT,
+	current_message_id INTEGER,
+	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS messages ( 
+	id INTEGER PRIMARY KEY, 
+	chat_id INTEGER NOT NULL,
+	content TEXT, 
+	chain TEXT,
+	role TEXT NOT NULL,
+	parent_message_id INTEGER,
+	FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
+);

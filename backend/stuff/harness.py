@@ -3,6 +3,16 @@ import json
 import os 
 from tavily import TavilyClient
 
+from litellm.llms.openai_like.json_loader import JSONProviderRegistry, SimpleProviderConfig
+
+JSONProviderRegistry.load()  # ensure existing ones are loaded first
+JSONProviderRegistry._providers["opencode-zen"] = SimpleProviderConfig(
+    "oepencode-zen",
+    {
+        "base_url": "https://opencode.ai/zen/v1",
+        "api_key_env": "OPENCODE_ZEN_API_KEY",
+    },
+)
 
 tools = [
     {
@@ -18,23 +28,7 @@ tools = [
                 "required": ["query"]
             }
         }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "followup",
-            "description": "give user simple followup question to select from premade answer feel free ",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "question": {"type": "string", "description": "question for the user"},
-                    "answers": {"type": "array", "description": "array of possible answers"}
-                },
-                "required": ["query"]
-            }
-        }
-    }
-]
+    }]
 
 tavily_client = TavilyClient(api_key=os.environ["TAVILY_API"])
 def websearch(query):
@@ -47,27 +41,36 @@ def harness(history,request, model):
     chain = []
     active = True
     while active:
-        response = completion(model, messages= history + [ {"role":"user","content":request}] + chain, tools=tools, stream=True)
+        messages = history + ([{"role":"user","content":request}] if request else []) + chain
+        for msg in messages:
+            if msg.get("role") == "assistant" and "reasoning_content" not in msg:
+                msg["reasoning_content"] = ""
+        print(messages)
+        print("Starting round of harness")
+        response = completion(model, messages, tools=tools, stream=True)
         chunks = []
         for chunk in response:
             chunks.append(chunk)
             delta = chunk['choices'][0]['delta']
-            yield chunk
+            print(delta)
+            yield delta.model_dump_json() + "\n"
 
         response = stream_chunk_builder(chunks)
         message = response.choices[0].message 
         chain.append(message.model_dump(exclude_none=True))
+
         if message.tool_calls:
-            print("Agent has called tool")
             for tool in message.tool_calls:
+                print(f"Agent has called tool {tool.function.name}")
+                print(tool.function.arguments)
                 args = json.loads(tool.function.arguments)
-                
                 match tool.function.name:
                     case "websearch":
                         data = websearch(args["query"])
+                        print(data)
                     case _:
                         data = "called tool does not exist"
-                chain.append({"role":"tool", "tool_call_id":tool.id, "content": data})
+                chain.append({"role":"tool", "tool_call_id":tool.id, "content": json.dumps(data)})
 
         else:
             active = False
@@ -75,14 +78,27 @@ def harness(history,request, model):
 
     return({
         "chain":chain,
-        "response":chain[-1]["content"]
+        "content":chain[-1]["content"]
         })
 
+
+system_prompt = """You are a title classifier. Read the user's message and output a short title summarizing it.
+
+Rules:
+- Output ONLY the title, nothing else (no quotes, no punctuation at the end, no preamble like "Title:")
+- 1-4 words, shorter is better
+- Not a full sentence — a label, like a tab title or search query
+- Match the language of the input (Czech in, Czech title; English in, English title)
+- Never leave it looking cut off mid-word
+"""
+
+def title(content):
+    response = completion("ollama_chat/gemma4:e4b", messages=[{"role":"system", "content":system_prompt},{"role":"user","content":content}]) 
+    return(response.choices[0].message["content"])
+
+
+
+
+
+
     
-
-
-
-
-
-    
-harness([], input("enter your prompt: "), "ollama_chat/gemma4:e4b")

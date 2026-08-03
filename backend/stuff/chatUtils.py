@@ -5,7 +5,7 @@ class Error(Exception):
         super().__init__(error_msg)
 
 
-def CreateChat(conn, user_id, chatName):
+def CreateChat(conn, user_id, chatName=None):
     cursor = conn.cursor()
     if chatName:
         cursor.execute("insert into chats (user_id, name) values (?,?)",(user_id,chatName))
@@ -24,9 +24,20 @@ def InsertMessage(conn, user_id, chat_id, role, content, chain=None):
         raise Error("user is not owner of this chat", "permission")
     cursor.execute("insert into messages (chat_id, content, role, parent_message_id, chain) values (?,?,?,?,?)",(chat_id, content,role, chat["current_message_id"] or None, chain))
     message_id = cursor.lastrowid
+    # Set to current message
     cursor.execute("update chats set current_message_id = ? where id = ?", (message_id, chat_id))
     conn.commit()
     return message_id
+
+def RenameChat(conn, user_id, chat_id, new_name):
+    cursor = conn.curosr()
+    chat = cursor.execute("select user_id from chats where id = ?", (chat_id,)).fetchone()
+    if chat["user_id"] != user_id:
+        return Error("user is not owner of this chat","permission")
+    cursor.execute("update chats set name = ? where id = ?",(new_name,chat_id))
+
+    
+
 
 def GetChat(conn, user_id, chat_id):
     cursor = conn.cursor()
@@ -44,12 +55,21 @@ def GetChat(conn, user_id, chat_id):
             "messages":[]
             }
     for message in messages:
-        chatStruct["messages"].append({
-            "id":message["id"],
-            "content":message["content"],
-            "role":message["role"],
-            "parent_message_id": message["parent_message_id"]
-            })
+        if message["role"] == "user":
+            chatStruct["messages"].append({
+                "id":message["id"],
+                "content":message["content"],
+                "role":message["role"],
+                "parent_message_id": message["parent_message_id"]
+                })
+        else:
+            chatStruct["messages"].append({
+                "id":message["id"],
+                "content":message["content"],
+                "role":message["role"],
+                "chain":message["chain"],
+                "parent_message_id": message["parent_message_id"]
+                })
     return chatStruct
 
 def GetChats(conn, user_id, limit=10):
@@ -58,7 +78,8 @@ def GetChats(conn, user_id, limit=10):
     chatsStruct = []
     for chat in chats:
         chatsStruct.append({
-            "name":chat["name"] or "new chat"
+            "name":chat["name"] or "new chat",
+            "id":chat["id"]
             })
     return chatsStruct
 

@@ -1,10 +1,17 @@
-from stuff.chatUtils import InsertMessage, SetCurrentMessage
+from stuff.chatUtils import InsertMessage, CreateChat
 import json
-from stuff.harness import harness
-def chat(conn,user_id, chat_id, content):
+from stuff.harness import harness, title
+def chat(conn,user_id, chat_id, content, model):
     cursor = conn.cursor()
-    # Verify chat existence
-    chat = cursor.execute("select * from chats where id = ?",(chat_id,)).fetchone()
+    
+    chat = None
+    if(chat_id):
+        # Verify chat existence
+        chat = cursor.execute("select * from chats where id = ?",(chat_id,)).fetchone()
+    else:
+        chat_id = CreateChat(conn, user_id, title(content)) 
+        # calling title function here is slow and unefficent should instead start async job that renames chat later 
+        chat = cursor.execute("select * from chats where id = ?",(chat_id,)).fetchone()
 
     # Insert user message
     last_message = InsertMessage(conn, user_id, chat_id, "user", content)
@@ -13,7 +20,6 @@ def chat(conn,user_id, chat_id, content):
     if chat is None:
         print("nope replace with error later")
     messages = cursor.execute("select * from messages where chat_id = ?",(chat_id,)).fetchall()
-
     # Rebuilding chat array
 
     # Start for loop of finding message parent_message_id and store into array 
@@ -22,7 +28,15 @@ def chat(conn,user_id, chat_id, content):
     while not found:
         for message in messages:
             if message["id"] == last_message:
-                history += json.load(message["chain"])
+                if message["role"] == "assistant":
+                    chain = json.loads(message["chain"])
+                    chain.reverse()
+                    history += chain
+                else:
+                    history.append({
+                        "role":"user",
+                        "content":message["content"]
+                        })
                 if message["parent_message_id"] is not None:
                     last_message = message["parent_message_id"]
                 else:
@@ -33,8 +47,7 @@ def chat(conn,user_id, chat_id, content):
     
     # start harness
     active = True 
-    g = harness()
-    chunks = []
+    g = harness(history,None,model)
     response = None
 
 
@@ -42,13 +55,18 @@ def chat(conn,user_id, chat_id, content):
 
     while True: 
         try:
-            chunks.append(next(g))
+            yield next(g)
         except StopIteration as e:
             response = e.value  
             break
 
-    last_message = InsertMessage(conn, user_id, chat_id, "assistant", response["content"], json.dump(response["chain"]))
-    SetCurrentMessage(conn, user_id, chat_id, last_message)
+    last_message = InsertMessage(conn, user_id, chat_id, "assistant", response["content"], json.dumps(response["chain"]))
 
-    print(response)
+    yield json.dumps({
+            "chat_id":chat_id
+            })
 
+    return({
+        "chain":response["chain"],
+        "response":response["content"]
+        })

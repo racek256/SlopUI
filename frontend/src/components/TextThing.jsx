@@ -33,7 +33,7 @@ export default function TextThing({sendMessage, active, interrupt, expanded}) {
 			<div className="absolute flex bottom-2 right-2 flex-row-reverse"	>	
 				<div onClick={()=>{
 					send(true)
-				}} className={`send-btn h-12 w-12   ${!active ? "bg-[#00288e]" : "bg-[#b8c4ff]"}  z-[10] cursor-pointer rounded-xl flex items-center justify-center p-3`}>
+				}} className={`send-btn h-12 w-12   ${!active ? "bg-[#00288e]" : "bg-[#b8c4ff]"}  z-10 cursor-pointer rounded-xl flex items-center justify-center p-3`}>
 					{!active ? <Send className="send-icon w-full h-full fill-[#e3e3e3] pointer-events-none" />
 					:  <Stop className="send-icon w-full h-full fill-[#e3e3e3] pointer-events-none"  />
 					}	

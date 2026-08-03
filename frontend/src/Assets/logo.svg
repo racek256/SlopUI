@@ -1,0 +1,10 @@
+<svg width="244" height="56" viewBox="0 0 244 56" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@800&amp;display=swap');
+    </style>
+  </defs>
+  <rect x="0" y="0" width="244" height="56" rx="8" fill="#FCF9F8"/>
+  <text x="63.68" y="38" font-family="Manrope, sans-serif" font-weight="800" font-size="36" fill="#00288E">Slop</text>
+  <text x="143.53" y="38" font-family="Manrope, sans-serif" font-weight="800" font-size="36" fill="#1C1B1B">UI</text>
+</svg>

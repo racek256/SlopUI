@@ -5,13 +5,28 @@ import os
 import uvicorn
 import sqlite3
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 load_dotenv()
 
 from auth.user import CreateUser 
 from routers.auth import router as auth_router
+from routers.chat import router as chat_router
 
 app = FastAPI()
 app.include_router(auth_router)
+app.include_router(chat_router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://100.64.0.32:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def main():
     initDB().close()

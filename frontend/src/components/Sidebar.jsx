@@ -17,10 +17,10 @@ export default function Sidebar({search,chats, loadChat, newChat}){
 					<p className=" ms-2 text-[#1c1b1b]">new chat</p>
 			</div>
 			{/* Search button */}
-			<div className="w-61    mt-2 p-1  hover:bg-[#eae7e6] transition-all cursor-pointer  rounded-xl HeadText text-xl flex items-center " onClick={()=>{search()}}>
+		{/*<div className="w-61    mt-2 p-1  hover:bg-[#eae7e6] transition-all cursor-pointer  rounded-xl HeadText text-xl flex items-center " onClick={()=>{search()}}>
 					<Search fill="black"  className="shrink-0 size-8 block"/>
 					<p className=" ms-2 text-[#1c1b1b]">search</p>
-			</div>
+			</div>*/}
 			{/* spearator */}
 			<div className='flex w-full items-center px-2'>
 				<div className='grow h-1 bg-black rounded-r-xl'/>

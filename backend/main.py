@@ -22,6 +22,8 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://100.64.0.32:5173",
+        "http://dev.racek.xyz",
+        "https://dev.racek.xyz",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -34,11 +36,11 @@ def main():
         uvicorn.run(app, host="0.0.0.0", port=8000)
 
 def initDB():
-    if not os.path.exists("db.sql"):
+    if not os.path.exists("db.db"):
         print("DB not found creating new")
     f = open("init.sql")
     init = f.read()
-    conn = sqlite3.connect('db.sql')
+    conn = sqlite3.connect('db.db')
     cursor = conn.cursor()
     cursor.executescript(init)
     # dev env check

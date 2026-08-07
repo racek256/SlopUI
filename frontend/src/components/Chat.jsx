@@ -3,13 +3,15 @@ import TextThing from "./TextThing"
 import Message from "./Message"
 import { useEffect } from "react"
 import { useRef } from "react";
-const apiUrl = import.meta.env.VITE_API_URL;
 
 
 export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 	const [active, setActive] = useState(false)
 	const [history, updateHistory] = useState([])
+	const [model, setModel] = useState({name:"deepseek v4 flash", id:"opencode-go/deepseek-v4-flash"})
 	const chat = useRef()
+
+	// Reconstruct history in current branch
 	function construct(data){
 		let currMSG = data.current_message_id
 		const new_arr = []
@@ -26,22 +28,22 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 		}
 		new_arr.reverse()
 		return new_arr
-
 	}
 
-
+	// Load selected chat
 	useEffect(()=>{
 		async function loadChat(){
 			const data = await fetch(`/api/chat/${chat_id}`)
 			if (data.ok){
 				const response = JSON.parse((await data.json()).chat)
 				console.log(response)
-				const new_history = construct(response)
+				const new_history = construct(response).map(m => ({ ...m, instant: true }))
 				updateHistory(new_history)
 			}
 		}
 		if(chat_id){
 			loadChat()
+			fastScrollDown()
 		}else if (chat_id == null){
 			updateHistory([])
 			setChatID(undefined)
@@ -50,6 +52,17 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 	
 	},[chat_id])
 
+	function fastScrollDown(){
+		const el = chat.current;
+		if(el){
+			el.scrollTo({
+				top: el.scrollHeight,
+				behavior: 'instant'
+			})
+		}
+	}
+
+	// scroll down
 	function scrollDown(){
 		const el = chat.current;
 		if(el){
@@ -65,6 +78,7 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 
 	// AI request
 	async function generate(content){	
+
 		function onObject(content) {
 			console.log(content)
 			if(content.chat_id){
@@ -81,13 +95,46 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 				}
 				return updated
 			  })
+			}else if (content.reasoning_content){
+				updateHistory(prev =>{
+					const updated = [...prev]
+					if(updated[updated.length-1]?.reason_chain[updated[updated.length-1].reason_chain.length-1]?.type == "reason"){
+						// Push streamed text to reasoning
+						console.log("pushing to existing reasoning element")
+						let element = updated[updated.length-1].reason_chain[updated[updated.length-1]?.reason_chain.length-1]
+						element.content += content.reasoning_content
+						updated[updated.length-1].reason_chain[updated[updated.length-1]?.reason_chain.length-1] = element
+					}else{
+						// Push new element to array and include reasoning
+						console.log("creating new reasoning element")
+						const element = {
+							type:"reason",
+							content:content.resoning_content
+						}
+						updated[updated.length-1].reason_chain.push(element)
+					}	
+					return updated
+
+				})
+			}else if (content.tool_calls[0].function.name =="websearch"){
+				updateHistory(prev =>{
+					const updated = [...prev]
+					console.log("creating new reasoning element (websearch)")
+					const element = {
+						type:"websearch",
+					}
+					updated[updated.length-1].reason_chain.push(element)
+					return updated
+				})
+
 			}
 		}
+
 		console.log(chat_id)
 		const response = await fetch(`/api/chat/send`,{
 			method:"POST",
 			headers:{"Content-Type":"application/json"},
-			body:JSON.stringify({content,chat_id:chat_id?.toString(),model:"opencode-zen/deepseek-v4-flash-free"}),
+			body:JSON.stringify({content,chat_id:chat_id?.toString(),model:model.id}),
 			credentials:"include"
 		})
 
@@ -153,7 +200,8 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 		// add AI message
 		oldH.push({
 			role:"ai",
-			content:""
+			content:"",
+			reason_chain:[]
 		})
 		updateHistory(oldH)	
 		setActive(true)
@@ -175,18 +223,18 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 	}
 
 	return(
-		<div className="w-full h-screen flex-col flex py-4  z-100 items-center">
-			<div ref={chat} className={`w-full ${expanded || history.length>0 ? "h-full" : "h-1/2"} transition-all duration-500 overflow-y-scroll flex flex-col items-center`}>
-				<div className={`w-1/2 transition-all  duration-500  py-12  h-full flex flex-col`}>
+		<div className="w-full h-screen flex-col flex py-4 pb-0 z-100 items-center overflow-hidden">
+			<div ref={chat} className={`w-full ${expanded || history.length>0 ? "h-full" : "h-1/2"} transition-all duration-500 overflow-y-scroll flex flex-col items-center `}>
+				<div className={`min-w-9/16 w-204 max-w-full transition-all  duration-500  py-12  h-full flex flex-col`}>
 					{history.map((e,i)=>(
-						<Message key={i} content={e.content} role={e.role} ></Message>
+						<Message key={i} message={e}></Message>
 					))}
 					<div className="h-24 w-full  shrink-0"></div>
 		
 			
 				</div>
 			</div>
-			<TextThing expanded={expanded} active={active} sendMessage={sendMessage} interrupt={interrupt}/> {/* Not centered for now fix in future*/}
+			<TextThing expanded={expanded} active={active} sendMessage={sendMessage} interrupt={interrupt} model={model} setModel={setModel}/> {/* Not centered for now fix in future*/}
 		</div>
 	)
 }

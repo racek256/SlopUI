@@ -4,7 +4,9 @@ import Send from "../Assets/send.svg?react";
 import Stop from "../Assets/stop.svg?react"
 
 
-export default function TextThing({sendMessage, active, interrupt, expanded}) {
+export default function TextThing({sendMessage, active, interrupt, expanded, model,setModel}) {
+
+
 	const text = useRef()
 	function send(button){
 			console.log(text)
@@ -22,7 +24,7 @@ export default function TextThing({sendMessage, active, interrupt, expanded}) {
 
 	}
 	return (
-		<div className="bg-white  z-1 rounded-2xl relative w-9/16">
+		<div className="bg-white  z-1 rounded-2xl relative min-w-9/16 w-204 max-w-full -translate-y-4 shadow-none [box-shadow:0_-6px_8px_-3px_rgba(0,0,0,0.2)]">
 			<textarea autoFocus ref={text}  onKeyDown={e => {
 				if (e.key == "Enter"){
 					e.preventDefault()
@@ -38,7 +40,7 @@ export default function TextThing({sendMessage, active, interrupt, expanded}) {
 					:  <Stop className="send-icon w-full h-full fill-[#e3e3e3] pointer-events-none"  />
 					}	
 				</div>
-				<ModelSelector expanded={expanded}/>
+				<ModelSelector expanded={expanded} model={model} setModel={setModel}/>
 		
 			</div>
 		</div>

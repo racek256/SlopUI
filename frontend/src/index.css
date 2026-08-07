@@ -86,31 +86,6 @@ body {
 .markdown-body li {
   margin: 0.15em 0;
 }
-/* Scrollbar */
-
-/* Chrome, Edge, Safari */
-::-webkit-scrollbar {
-  width: 16px;
-}
-
-::-webkit-scrollbar-track {
-  background: #111;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #666;
-  border-radius: 9999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #888;
-}
-
-/* Firefox */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: #666 #111;
-}
 .roboto{
   font-family: "Manrope", sans-serif;
   font-optical-sizing: auto;

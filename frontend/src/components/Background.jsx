@@ -9,7 +9,9 @@ export default function Background({expanded}){
 	const divRef = useRef()
 	useEffect(()=>{
 		const observer = new ResizeObserver((entries)=>{
-			setNumber(Math.round(entries[0].contentRect.width/56))
+			if(Math.round(entries[0].contentRect.width/56) > 0){
+				setNumber(Math.round(entries[0].contentRect.width/56))
+			}
 
 		})
 		observer.observe(divRef.current)

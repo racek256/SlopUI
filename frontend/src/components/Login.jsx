@@ -8,6 +8,7 @@ const apiUrl = import.meta.env.VITE_API_URL;
 export default function Login({finishLogin}){
 	const [signup, switchsignup] = useState(false)
 	const [error, setError] = useState(null)
+	const [demo] = useState(true)
 	const username = useRef()
 	const password = useRef()
 
@@ -21,10 +22,11 @@ export default function Login({finishLogin}){
 				<div className="bg-[#00288e] h-full w-4"/>
 				<div className={`flex justify-center items-center shadow grow h-full rounded-r-lg select-none cursor-pointer ${signup && "bg-[#e1e1e1]"} `} onClick={()=>{switchsignup(true)}}>Sign up</div>
 			</div>
-			<input ref={username} className="border-[#c1c1c1] border rounded-lg p-2 w-full h-12 mt-6" placeholder='enter username'/>
-			<input ref={password} className="border-[#c1c1c1] border rounded-lg p-2 w-full h-12 mt-2" placeholder='enter password' type="password"/>
-			{error && <p className="self-start py-1 text-red-500 text-bold">{error}</p>}
-			<button className="bg-[#00288e] hover:bg-[#10389e] transition-all cursor-pointer text-white py-2 px-4 rounded-xl mt-2"
+			{demo & signup ? <p className="p-6 text-xl">Signup is disabled in demo mode</p>: <div className="flex flex-col w-full">
+				<input ref={username} className="border-[#c1c1c1] border rounded-lg p-2 w-full h-12 mt-4" placeholder='enter username'/>
+				<input ref={password} className="border-[#c1c1c1] border rounded-lg p-2 w-full h-12 mt-2" placeholder='enter password' type="password"/>
+		{error && <p className="self-start py-1 text-red-500 text-bold">{error}</p>}
+			<button className="bg-[#00288e] hover:bg-[#10389e] transition-all cursor-pointer w-full text-white py-2 px-4 rounded-lg mt-2"
 			onClick={async ()=>{
 				let success = undefined
 				if(signup){
@@ -36,8 +38,9 @@ export default function Login({finishLogin}){
 					finishLogin()
 				}
 			}}
-			>{signup ? "Create account" : "sign in"}</button>
-		</div>
+			>{signup ? "Create account" : "sign in"}</button></div>}
+		{demo && <button className="bg-[#3f6212] hover:bg-[#4d7c0f] transition-all cursor-pointer w-full text-white py-2 px-4 rounded-lg mt-2">Skip Login (Demo)</button>}
+					</div>
 
 
 		</div>

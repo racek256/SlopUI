@@ -1,0 +1,17 @@
+{
+	"allowed_models":[
+		{
+			"provider":"opencode-zen",
+			"models":[{"id":"opencode-go/deepseek-v4-flash", "name":"deepseek v4 flash"}, {"id":"opencode-go/mimo-v2.5", "name":"mimo v2.5"}],
+			"format":"openai",
+			"baseURL":"https://opencode.ai/go/v1",
+			"api_key_env":"OPENCODE_ZEN_API_KEY"
+		},
+		{
+			"provider":"openrouter",
+			"models":[{"id":"openrouter/qwen/qwen3.7-flash","name":"qwen3.7 flash"}],
+			"format":"builtin",
+			"api_key_env":"OPENROUTER_API_KEY"
+		}
+	]
+}

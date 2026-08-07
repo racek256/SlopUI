@@ -7,13 +7,21 @@ from litellm.llms.openai_like.json_loader import JSONProviderRegistry, SimplePro
 
 JSONProviderRegistry.load()  # ensure existing ones are loaded first
 JSONProviderRegistry._providers["opencode-zen"] = SimpleProviderConfig(
-    "oepencode-zen",
+    "opencode-zen",
     {
         "base_url": "https://opencode.ai/zen/v1",
         "api_key_env": "OPENCODE_ZEN_API_KEY",
     },
 )
 
+JSONProviderRegistry.load()  # ensure existing ones are loaded first
+JSONProviderRegistry._providers["opencode-go"] = SimpleProviderConfig(
+    "opencode-go",
+    {
+        "base_url": "https://opencode.ai/zen/go/v1",
+        "api_key_env": "OPENCODE_GO_API_KEY",
+    },
+)
 tools = [
     {
         "type": "function",
@@ -32,7 +40,14 @@ tools = [
 
 tavily_client = TavilyClient(api_key=os.environ["TAVILY_API"])
 def websearch(query):
-    return tavily_client.search(query)
+    for x in range(2):
+        try:
+            return tavily_client.search(query)
+        except:
+            pass
+    return {
+            "message":"Websearch failed please try again later"
+            }
 
     
 
@@ -93,7 +108,7 @@ Rules:
 """
 
 def title(content):
-    response = completion("ollama_chat/gemma4:e4b", messages=[{"role":"system", "content":system_prompt},{"role":"user","content":content}]) 
+    response = completion("openrouter/google/gemini-2.5-flash-lite", messages=[{"role":"system", "content":system_prompt},{"role":"user","content":content}]) 
     return(response.choices[0].message["content"])
 
 

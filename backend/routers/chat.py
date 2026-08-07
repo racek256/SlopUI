@@ -6,6 +6,7 @@ from fastapi import  Depends, Request, HTTPException, Cookie, APIRouter, Respons
 from stuff.chat import chat
 from DB.connection import get_conn
 from stuff.chatUtils import RenameChat, GetChat, GetChats
+from stuff.configUtils import listModels, checkModel
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 class MessageData(BaseModel):
@@ -21,6 +22,8 @@ def sendMessage(data: MessageData, conn = Depends(get_conn), user_id = Depends(a
     if user_id == None: # Development hack remember to remove before commit
         print("user isn't authenticated")
         raise HTTPException(status_code=401, detail="Unauthorized request")
+    if not checkModel(data.model):
+        raise HTTPException(status_code=404, detail="Model not availible")
     def generate():
         g = chat(conn, user_id, data.chat_id, data.content, data.model)
         yield from g
@@ -47,6 +50,14 @@ def Chats(limit: int =50, conn = Depends(get_conn), user_id = Depends(authentica
     except:
         raise HTTPException(status_code=500, detail="internal server error")
 
+@router.get("/models")
+def getModels():
+    try:
+        models = listModels()
+        return JSONResponse(status_code=200, content={"models":models}) 
+    except:
+        raise HTTPException(status_code=500, detail="internal server error")
+
 @router.get("/{chat_id}")
 def loadChat(chat_id:int, conn = Depends(get_conn), user_id= Depends(authenticate)):
     if user_id is None:
@@ -56,3 +67,5 @@ def loadChat(chat_id:int, conn = Depends(get_conn), user_id= Depends(authenticat
         return JSONResponse(status_code=200, content={"chat":chat})
     except:
         raise HTTPException(status_code=500, detail="internal server error")
+
+

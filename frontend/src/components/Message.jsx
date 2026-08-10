@@ -8,27 +8,19 @@ import Reasoning from "./Reasoning"
 
 import { motion } from "framer-motion"
 export default function Message({message}){
-	console.log(message.instant)
-	const [text,updateText] = useState("")
 
-	useEffect(()=>{
-		updateText(message.content)	
-		
-	},[message.content])
-
-	if (message.role =="user"){
-		return(
-			<motion.div className="border-[#b8c4ff] border bg-white w-max text-xl rounded-2xl p-4 px-5 self-end max-w-2/3 my-2 "
-			initial={!message.instant && {opacity:0, y:10}}
-			animate={{opacity:1,y:0}}
-			
-			>
-			<p className="w-full whitespace-pre-wrap">	
+	if (message.role === "user") {
+	  return (
+		<motion.div
+		  className="border-[#b8c4ff] border bg-white w-max max-w-2/3 min-w-0 self-end my-2 rounded-2xl p-4 px-5"
+		  initial={!message.instant && { opacity: 0, y: 10 }}
+		  animate={{ opacity: 1, y: 0 }}
+		>
+		  <p className="whitespace-pre-wrap break-words">
 			{message.content}
-			</p>
-
-			</motion.div>
-		)
+		  </p>
+		</motion.div>
+	  );
 	}else{	
 		return(
 			<div className="min-w-full">
@@ -53,7 +45,7 @@ export default function Message({message}){
 						</div>
 					<div className=" w-full inline">	
 						<ReactMarkdown remarkPlugins={[remarkGfm]}>	
-						{text}
+						{message.content}
 						</ReactMarkdown >
 					</div>
 				</div>

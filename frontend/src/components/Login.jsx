@@ -4,13 +4,14 @@ import { useRef } from 'react'
 import Cookies from 'js-cookie'
 
 
-const apiUrl = import.meta.env.VITE_API_URL;
 export default function Login({finishLogin}){
+	const demo = import.meta.env.VITE_DEMO_MODE;
 	const [signup, switchsignup] = useState(false)
 	const [error, setError] = useState(null)
-	const [demo] = useState(true)
 	const username = useRef()
 	const password = useRef()
+
+
 
 	return(
 		<div>
@@ -39,7 +40,13 @@ export default function Login({finishLogin}){
 				}
 			}}
 			>{signup ? "Create account" : "sign in"}</button></div>}
-		{demo && <button className="bg-[#3f6212] hover:bg-[#4d7c0f] transition-all cursor-pointer w-full text-white py-2 px-4 rounded-lg mt-2">Skip Login (Demo)</button>}
+		{demo && <button className="bg-[#3f6212] hover:bg-[#4d7c0f] transition-all cursor-pointer w-full text-white py-2 px-4 rounded-lg mt-2" onClick={async ()=>{
+		let success = undefined 
+		success = await login("demo","demo")
+		if (success){
+			finishLogin()
+		}
+		}}>Skip Login (Demo)</button>}
 					</div>
 
 

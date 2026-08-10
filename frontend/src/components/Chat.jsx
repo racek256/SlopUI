@@ -2,7 +2,7 @@ import { useState } from "react"
 import TextThing from "./TextThing"
 import Message from "./Message"
 import { useEffect } from "react"
-import { useRef } from "react";
+import { useRef, useLayoutEffect } from "react";
 
 
 export default function Chat({expanded, setExpanded, chat_id, setChatID}){
@@ -10,6 +10,7 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 	const [history, updateHistory] = useState([])
 	const [model, setModel] = useState({name:"deepseek v4 flash", id:"opencode-go/deepseek-v4-flash"})
 	const chat = useRef()
+	const prevHistoryLen = useRef(0)
 
 	// Reconstruct history in current branch
 	function construct(data){
@@ -38,12 +39,12 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 				const response = JSON.parse((await data.json()).chat)
 				console.log(response)
 				const new_history = construct(response).map(m => ({ ...m, instant: true }))
+				prevHistoryLen.current = 0
 				updateHistory(new_history)
 			}
 		}
 		if(chat_id){
 			loadChat()
-			fastScrollDown()
 		}else if (chat_id == null){
 			updateHistory([])
 			setChatID(undefined)
@@ -52,15 +53,19 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 	
 	},[chat_id])
 
-	function fastScrollDown(){
-		const el = chat.current;
-		if(el){
-			el.scrollTo({
-				top: el.scrollHeight,
-				behavior: 'instant'
-			})
-		}
-	}
+
+
+	useLayoutEffect(() => {
+	  const el = chat.current
+	  if (!el || history.length === 0) return
+
+	  const newMessage = history.length !== prevHistoryLen.current
+	  prevHistoryLen.current = history.length
+
+	  if (newMessage || el.scrollHeight - el.scrollTop - el.clientHeight < 50) {
+		  el.scrollTop = el.scrollHeight   // instant, no smooth, no transition
+	  }
+	}, [history])
 
 	// scroll down
 	function scrollDown(){
@@ -224,8 +229,8 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 
 	return(
 		<div className="w-full h-screen flex-col flex py-4 pb-0 z-100 items-center overflow-hidden">
-			<div ref={chat} className={`w-full ${expanded || history.length>0 ? "h-full" : "h-1/2"} transition-all duration-500 overflow-y-scroll flex flex-col items-center `}>
-				<div className={`min-w-9/16 w-204 max-w-full transition-all  duration-500  py-12  h-full flex flex-col`}>
+			<div ref={chat} className={`w-full ${expanded || history.length>0 ? "h-full" : "h-1/2"}  overflow-y-scroll flex flex-col items-center transition-all duration-500 `}>
+				<div className={`min-w-9/16 w-204 max-w-full   py-12   flex flex-col`}>
 					{history.map((e,i)=>(
 						<Message key={i} message={e}></Message>
 					))}

@@ -24,16 +24,16 @@ async def authenticate(request: Request):
 
 router = APIRouter(prefix="/auth",tags=["auth"])
 
-#@router.post("/register")
-#def RegisterUser(data:UserData, conn = Depends(get_conn)):
-#    try:
-#        result = CreateUser(conn, data.username, data.password)
-#        return JSONResponse(content={"success":True, "token":result}, status_code=201)
-#    except Error as e:
-#        if(e.error_type == "validation"):
-#            return JSONResponse(content={"error":e.error_message}, status_code=422)
-#        else:
-#            raise HTTPException(status_code=500, detail="internal server error")
+@router.post("/register")
+def RegisterUser(data:UserData, conn = Depends(get_conn)):
+    try:
+        result = CreateUser(conn, data.username, data.password)
+        return JSONResponse(content={"success":True, "token":result}, status_code=201)
+    except Error as e:
+        if(e.error_type == "validation"):
+            return JSONResponse(content={"error":e.error_message}, status_code=422)
+        else:
+            raise HTTPException(status_code=500, detail="internal server error")
 
 
 @router.post("/login")

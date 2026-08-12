@@ -1,4 +1,5 @@
 import Search from '../Assets/search.svg?react'
+import Webfetch from '../Assets/webfetch.svg?react'
 import { AnimatePresence, motion } from 'framer-motion'
 
 export default function Reasoning({ message }) {
@@ -26,7 +27,7 @@ export default function Reasoning({ message }) {
 									y: -10,
 									opacity: 0
 								}}
-								transition={{duration:0.5}}
+								transition={{ duration: 0.5 }}
 								key="reason"
 								className=" bg-[#b8c4ff] w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
 								<div className="w-6 h-6 m-1 animate-spin transition-all bg-black loading" /> Reasoning</motion.div>
@@ -47,12 +48,11 @@ export default function Reasoning({ message }) {
 									y: -10,
 									opacity: 0
 								}}
-								transition={{duration:0.5}}
+								transition={{ duration: 0.5 }}
 								key="websearch"
 								className="  bg-[#b8c4ff] w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
 								<Search fill="black" className="shrink-0 animate-pulse size-8 block" /> Websearch</motion.div>)
-					}
-				} else if (!message.content) {
+					} else if (reason?.type == "webfetch") {
 					return (
 						<motion.div
 							initial={{
@@ -67,7 +67,27 @@ export default function Reasoning({ message }) {
 								y: -10,
 								opacity: 0
 							}}
-							transition={{duration:0.5}}
+							transition={{ duration: 0.5 }}
+							key="webfetch"
+							className="  bg-[#b8c4ff] w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
+							<Webfetch fill="black" className="shrink-0 animate-pulse size-8 block" /> Webfetch</motion.div>)
+				} 
+				} else if(!message.content) {
+					return (
+						<motion.div
+							initial={{
+								y: 10,
+								opacity: 0
+							}}
+							animate={{
+								y: 0,
+								opacity: 1
+							}}
+							exit={{
+								y: -10,
+								opacity: 0
+							}}
+							transition={{ duration: 0.5 }}
 							key="waking"
 
 							className="  bg-[#b8c4ff] w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
@@ -75,6 +95,7 @@ export default function Reasoning({ message }) {
 
 					)
 				}
+				
 
 			})()}
 		</AnimatePresence>

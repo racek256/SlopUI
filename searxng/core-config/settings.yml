@@ -1,0 +1,182 @@
+# ============================================================
+# SearXNG settings.yml - hardened high-volume AI-agent instance
+# ============================================================
+# Design goals:
+#   1. Engine rotation/redundancy: 8-10+ general engines enabled so a
+#      blocked engine never kills result availability.
+#   2. Never suspend engines on CAPTCHA/429 for long (SearxEngineCaptcha: 0)
+#      - with rotating egress the NEXT request comes from a clean IP.
+#   3. JSON API-first: formats whitelist keeps HTML rendering overhead out
+#      of the hot path; autocomplete/favicons off.
+#   4. IPv4-only outbound (source_ips: 0.0.0.0) - fixes many Google/Bing
+#      datacenter-IP issues.
+#   5. Proxy pool support pre-wired (commented out) for egress rotation.
+#
+# Verified against image 2026.8.4-c63835bd2 defaults.
+# ============================================================
+
+use_default_settings:
+  engines:
+    # Google web/images/videos are `inactive` (removed) by default in current
+    # versions. We re-activate web only; images/videos stay off (most-blocked).
+    remove:
+      - google images
+      - google videos
+
+server:
+  # secret_key is injected via SEARXNG_SECRET env var (.env) - do not put it here.
+  # Public-instance / bot-defense features are intentionally OFF:
+  #   - limiter: the built-in limiter caps JSON API traffic at API_MAX=4 req/hour/IP
+  #     (hardcoded) which would throttle AI agents. For an internal AI instance
+  #     keep it off. To enable later: set limiter: true + whitelist agent IPs in
+  #     limiter.toml ([botdetection.ip_lists] pass_ip).
+  limiter: false
+  public_instance: false
+  # Image proxy uses memory and adds latency - not needed for AI agents.
+  image_proxy: false
+  # GET makes agent calls trivially curl-able (/search?q=...&format=json).
+  method: GET
+  default_http_headers:
+    X-Content-Type-Options: nosniff
+    X-Frame-Options: DENY
+    X-XSS-Protection: "1; mode=block"
+    Referrer-Policy: "no-referrer"
+
+search:
+  # 0 = no filtering. For an unfiltered AI research tool.
+  safe_search: 0
+  # Autocomplete OFF - saves extra engine requests per query.
+  autocomplete: ""
+  # Favicon resolver OFF - saves a lookup per result.
+  favicon_resolver: ""
+  # Pin default language instead of "auto" (per-request browser sniffing).
+  default_lang: "en"
+  # Whitelist of response formats. JSON is the AI workhorse; html kept for
+  # manual debugging. CSV/RSS disabled = 403, less surface.
+  formats:
+    - html
+    - json
+  # Engine ban/suspension after failures.
+  ban_time_on_fail: 5
+  max_ban_time_on_fail: 120
+  suspended_times:
+    # CRITICAL for rotation: a CAPTCHA on ONE egress IP must not kill the engine
+    # for the next request from a clean IP. 0 = never suspend on captcha.
+    # (maintainer-endorsed pattern: PR #5922)
+    SearxEngineAccessDenied: 60
+    SearxEngineCaptcha: 0
+    SearxEngineTooManyRequests: 30
+    # Cloudflare-based engines get a short cooldown, not the default 15 days.
+    cf_SearxEngineCaptcha: 3600
+    cf_SearxEngineAccessDenied: 3600
+    # reCAPTCHA engines: moderate cooldown.
+    recaptcha_SearxEngineCaptcha: 86400
+
+outgoing:
+  # Higher than default 3.0s: slow-but-alive engines stop being counted as dead.
+  request_timeout: 6.0
+  max_request_timeout: 15.0
+  # Pool sizes for outbound httpx connections (concurrency under load).
+  pool_connections: 100
+  pool_maxsize: 20
+  enable_http2: true
+  # One retry per failed request. With a proxy pool, EACH retry uses the NEXT
+  # proxy + source IP (round-robin) - this is the core of "rotation".
+  retries: 1
+  max_redirects: 30
+  # Force IPv4 outbound. Many engines (Google/Bing) behave badly over IPv6 from
+  # datacenter ranges. 0.0.0.0 = IPv4 only.
+  source_ips: 0.0.0.0
+  # --- PROXY POOL (egress IP rotation) ---
+  # Uncomment and fill in to rotate outbound IPs. Each request picks the next
+  # proxy round-robin; each retry uses a different proxy.
+  # Works with HTTP and SOCKS5 proxies. socks5h = remote DNS (no DNS leaks).
+  # proxies:
+  #   all://:
+  #     - socks5h://user:pass@proxy1:1080
+  #     - socks5h://user:pass@proxy2:1080
+  #     - http://proxy3:8080
+  # For Tor integration: set `using_tor_proxy: true` per-engine or globally.
+
+engines:
+  # ---- Re-enable engines that ship disabled/inactive ----
+  - name: google
+    engine: google
+    inactive: false
+    weight: 1
+    retry_on_http_error: [403, 429]
+    retries: 1
+
+  - name: bing
+    engine: bing
+    disabled: false
+    weight: 1
+    retry_on_http_error: [429]
+
+  - name: mojeek
+    disabled: false
+    weight: 1
+
+  - name: yahoo
+    disabled: false
+    weight: 1
+
+  - name: yep
+    disabled: false
+    weight: 1
+
+  # ---- Weight the stable engines higher so their results dominate ----
+  - name: duckduckgo
+    weight: 2
+
+  - name: brave
+    weight: 2
+
+  - name: qwant
+    disabled: false
+    weight: 2
+
+  - name: startpage
+    weight: 1
+
+  - name: wikipedia
+    weight: 1
+
+  - name: wikidata
+    weight: 1
+
+  - name: github
+    inactive: false
+    weight: 1
+
+  - name: arxiv
+    weight: 1
+
+  - name: google news
+    inactive: false
+    weight: 1
+
+  - name: google cse
+    weight: 1
+
+  - name: google scholar
+    weight: 1
+
+  - name: docker hub
+    weight: 1
+
+  - name: openverse
+    weight: 1
+
+# Lock preferences so agents cannot accidentally change formats/language
+# per-request via cookies (stable, deterministic behavior).
+# Valid enum values (settings_schema): categories, language, locale,
+# autocomplete, favicon_resolver, image_proxy, method, safesearch, theme,
+# results_on_new_tab, doi_resolver, simple_style, center_alignment,
+# query_in_title, search_on_category_select.
+preferences:
+  lock:
+    - autocomplete
+    - method
+    - language
+    - safesearch

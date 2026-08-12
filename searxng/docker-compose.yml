@@ -1,0 +1,66 @@
+# ============================================================
+# SearXNG - hardened high-volume AI-agent deployment
+# Based on the canonical template from searxng/searxng:container/
+# (the old searxng-docker repo is ARCHIVED). Hardened with:
+#   - pinned image version (stability)
+#   - resource limits (host has 6 cores / ~2.3Gi free RAM)
+#   - healthchecks, log rotation, restart policy
+#   - Valkey sidecar for limiter/bot-detection (ready to enable)
+# ============================================================
+
+name: searxng
+
+services:
+  core:
+    container_name: searxng-core
+    image: docker.io/searxng/searxng:${SEARXNG_VERSION:-latest}
+    restart: unless-stopped
+    ports:
+      # SEARXNG_PORT is mapped to GRANIAN_PORT by the container entrypoint,
+      # so host and container port stay in sync (default 8080).
+      - "${SEARXNG_HOST:-0.0.0.0}:${SEARXNG_PORT:-8080}:${SEARXNG_PORT:-8080}"
+    env_file: ./.env
+    volumes:
+      # settings.yml + limiter.toml live here (entrypoint creates settings.yml
+      # from template only if it does not exist - we ship our own below).
+      - ./core-config/:/etc/searxng/
+      # favicon cache, engine cache DB, etc.
+      - core-data:/var/cache/searxng/
+    deploy:
+      resources:
+        limits:
+          cpus: "3.0"
+          memory: 1536m
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:${SEARXNG_PORT:-8080}/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  valkey:
+    container_name: searxng-valkey
+    image: docker.io/valkey/valkey:9-alpine
+    command: valkey-server --save 30 1 --loglevel warning
+    restart: unless-stopped
+    volumes:
+      - valkey-data:/data/
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+volumes:
+  core-data:
+  valkey-data:

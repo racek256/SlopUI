@@ -121,12 +121,12 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 					return updated
 
 				})
-			}else if (content.tool_calls[0].function.name =="websearch"){
+			}else if (content.tool_calls[0].function.name){
 				updateHistory(prev =>{
 					const updated = [...prev]
-					console.log("creating new reasoning element (websearch)")
+					console.log("creating new reasoning element")
 					const element = {
-						type:"websearch",
+						type:content.tool_calls[0].function.name,
 					}
 					updated[updated.length-1].reason_chain.push(element)
 					return updated

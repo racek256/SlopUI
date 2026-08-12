@@ -1,0 +1,50 @@
+# ============================================================
+# SearXNG limiter.toml - bot detection / rate limits
+# ============================================================
+# Currently INACTIVE (server.limiter: false in settings.yml).
+# This file is pre-configured so you can enable the limiter later:
+#   1. In settings.yml set `server.limiter: true`
+#   2. Restart: `docker compose restart core`
+#
+# WARNING: the built-in limiter hardcodes JSON API traffic to
+# API_MAX = 4 requests/hour/IP. That will throttle AI agents.
+# Whitelist your agent egress IPs in `pass_ip` below BEFORE enabling.
+# ============================================================
+
+[botdetection]
+# IP prefix length used when hashing client IPs for rate limits.
+ipv4_prefix = 32
+ipv6_prefix = 48
+
+# Reverse proxies / load balancers whose X-Forwarded-For we trust.
+# MUST include any proxy in front of SearXNG (Caddy/nginx/LB), otherwise
+# every client looks like the proxy IP and rate limits collapse.
+trusted_proxies = [
+  '127.0.0.0/8',
+  '::1',
+  '10.0.0.0/8',
+  '172.16.0.0/12',
+  '192.168.0.0/16',
+  '100.64.0.0/10',   # Tailscale / CGNAT range
+]
+
+[botdetection.ip_limit]
+# link_token makes non-browser clients "suspicious" (they never fetch the
+# token CSS). For AI agents keep it FALSE - otherwise limits drop to
+# 2 requests/burst + 10 per 10 minutes.
+filter_link_local = false
+link_token = false
+
+[botdetection.ip_lists]
+# IPs that bypass ALL rate limiting (whitelist). Add your AI agent egress
+# ranges here before enabling the limiter.
+# pass_ip = [
+#   '10.0.0.0/8',
+#   '203.0.113.0/24',
+# ]
+
+# IPs that are always blocked.
+block_ip = []
+
+# Allow searxng.org monitoring bot.
+pass_searxng_org = true

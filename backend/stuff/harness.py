@@ -1,8 +1,9 @@
+from stuff.tools.webfetch import webfetch
 from litellm import completion, stream_chunk_builder
+from tavily import TavilyClient
 import json
 import os 
-from tavily import TavilyClient
-
+from stuff.tools.websearch import websearch 
 from litellm.llms.openai_like.json_loader import JSONProviderRegistry, SimpleProviderConfig
 
 JSONProviderRegistry.load()  # ensure existing ones are loaded first
@@ -36,10 +37,40 @@ tools = [
                 "required": ["query"]
             }
         }
-    }]
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "websearch-beta",
+            "description": "newer version of websearch still in development",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "your search query"}
+                },
+                "required": ["query"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "webfetch",
+            "description": "fetches all data from webpage and returns content in markdown",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "url of any page"}
+                },
+                "required": ["url"]
+            }
+        }
+    }
+
+    ]
 
 tavily_client = TavilyClient(api_key=os.environ["TAVILY_API"])
-def websearch(query):
+def websearchold(query):
     for x in range(2):
         try:
             return tavily_client.search(query)
@@ -48,6 +79,7 @@ def websearch(query):
     return {
             "message":"Websearch failed please try again later"
             }
+
 
     
 
@@ -80,9 +112,14 @@ def harness(history,request, model):
                 print(tool.function.arguments)
                 args = json.loads(tool.function.arguments)
                 match tool.function.name:
-                    case "websearch":
-                        data = websearch(args["query"])
+                    case "websearch-beta":
+                        data = websearch(args["query"]) 
                         print(data)
+                    case "websearch":
+                        data = websearchold(args["query"])
+                        print(data)
+                    case "webfetch":
+                        data = webfetch(args["url"])
                     case _:
                         data = "called tool does not exist"
                 chain.append({"role":"tool", "tool_call_id":tool.id, "content": json.dumps(data)})

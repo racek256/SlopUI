@@ -18,7 +18,7 @@ class RenameChatData(BaseModel):
     chat_name: str
 
 @router.post("/send", response_class=StreamingResponse)
-def sendMessage(data: MessageData, conn = Depends(get_conn), user_id = Depends(authenticate)):
+async def sendMessage(data: MessageData, conn = Depends(get_conn), user_id = Depends(authenticate)):
     if user_id == None: # Development hack remember to remove before commit
         print("user isn't authenticated")
         raise HTTPException(status_code=401, detail="Unauthorized request")

@@ -14,10 +14,14 @@
     "@tailwindcss/vite": "^4.3.2",
     "framer-motion": "^12.42.2",
     "js-cookie": "^3.0.8",
+    "katex": "^0.18.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-markdown": "^10.1.0",
+    "react-markdown-mermaid": "^0.0.3",
+    "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
     "tailwindcss": "^4.3.2"
   },
   "devDependencies": {

@@ -1,8 +1,8 @@
 {
 	"allowed_models":[
 		{
-			"provider":"opencode-zen",
-			"models":[{"id":"opencode-go/deepseek-v4-flash", "name":"deepseek v4 flash"}, {"id":"opencode-go/mimo-v2.5", "name":"mimo v2.5"}],
+			"provider":"opencode-go",
+			"models":[{"id":"opencode-go/deepseek-v4-flash", "name":"deepseek v4 flash"}, {"id":"opencode-go/mimo-v2.5", "name":"mimo v2.5"}, {"id":"opencode-go/muse-spark-1.2-contributor", "name":"Muse Spark 1.2"}],
 			"format":"openai",
 			"baseURL":"https://opencode.ai/go/v1",
 			"api_key_env":"OPENCODE_ZEN_API_KEY"

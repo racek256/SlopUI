@@ -1,29 +1,42 @@
 import trafilatura
+import time
+import os
 import httpx
 import numpy as np
-import pprint
 from concurrent.futures import ThreadPoolExecutor
-from tokenizers import Tokenizer
-from litellm import embedding  # sync version of aembedding
-from flashrank import Ranker, RerankRequest
+from litellm import embedding, rerank 
 from sentence_transformers import CrossEncoder
+import re
 
-tok = Tokenizer.from_pretrained("BAAI/bge-m3")
 
-
-def chunk_text(text, max_tokens=512, overlap=64):
-    """Split text into overlapping chunks of ~max_tokens tokens."""
-    ids = tok.encode(text).ids
-    chunks = []
-    start = 0
-    while start < len(ids):
-        end = min(start + max_tokens, len(ids))
-        chunks.append(tok.decode(ids[start:end], skip_special_tokens=True))
-        if end == len(ids):
-            break
-        start = end - overlap
+def chunk_text(text, max_chars=2000, overlap=200):
+    """Pure-Python overlapping chunker — no native tokenizer."""
+    text = text.strip()
+    if not text:
+        return []
+    if len(text) <= max_chars:
+        return [text]
+    # split on sentence boundaries where possible
+    parts = re.split(r'(?<=[.!?])\s+', text)
+    chunks, cur = [], ""
+    for p in parts:
+        if len(cur) + len(p) + 1 <= max_chars:
+            cur = (cur + " " + p).strip() if cur else p
+        else:
+            if cur:
+                chunks.append(cur)
+            if len(p) > max_chars:               # hard-split a monster sentence
+                for i in range(0, len(p), max_chars - overlap):
+                    chunks.append(p[i:i + max_chars])
+                cur = chunks.pop()[-overlap:] if overlap else ""
+            else:
+                cur = p
+    if cur:
+        chunks.append(cur)
+    if overlap and len(chunks) > 1:              # re-apply overlap window
+        chunks = [chunks[0]] + [(chunks[i-1][-overlap:] + " " + c).strip()
+                                for i, c in enumerate(chunks[1:], 1)]
     return chunks
-
 
 def fetch_page(client: httpx.Client, url: str):
     try:
@@ -41,18 +54,19 @@ def fetch_page(client: httpx.Client, url: str):
 
 
 def pages(urls):
-    headers = {"User-Agent": "SlopUI-bot/0.1 (research tool)"}
+    headers = {"User-Agent": "SlopUI-bot/0.1"}
 
     if not urls:
         return []
-    with httpx.Client(timeout=10.0, headers=headers, follow_redirects=True) as client:
+    with httpx.Client(timeout=10.0, headers=headers, follow_redirects=False) as client:
         with ThreadPoolExecutor(max_workers=min(len(urls), 20)) as pool:
             futures = [pool.submit(fetch_page, client, u) for u in urls]
             results = [f.result() for f in futures]
     return [r for r in results if r is not None]
 
 
-def embeddings(query, results):
+def embeddings(query, results, starttime):
+    print("starting embedding")
     content = []
     for result in results:
         for chunk in chunk_text(result["content"]):   
@@ -61,11 +75,11 @@ def embeddings(query, results):
     if not content:
         return []
 
-    print("running Embedding")
-    e_query = embedding(model="ollama/nomic-embed-text-v2-moe", input=query)
+    e_query = embedding(model=os.environ["EMBEDDING_MODEL"], input=query, num_retries=3)
     embeds = embedding(
-        model="ollama/nomic-embed-text-v2-moe",
+        model=os.environ["EMBEDDING_MODEL"],
         input=[c["content"] for c in content],
+        num_retries=3
     )
 
     query_vec = np.array(e_query["data"][0]["embedding"], dtype=np.float32)
@@ -73,24 +87,26 @@ def embeddings(query, results):
         [item["embedding"] for item in embeds["data"]], dtype=np.float32
     )
 
-    print("scoring embeddings")
     idx, scores = top_k_similar(query_vec, results_vec, 35)
 
-    print("running Reranker")
-    # Reranker magic
-    model = CrossEncoder("cross-encoder/ettin-reranker-68m-v1")
-    #ranker = Ranker(model_name="ms-marco-MiniLM-L-12-v2", cache_dir="/opt")
+    print(f"finished embedding in {time.perf_counter()-starttime}, starting reranking")
 
-    # construct array
-    #passages = []
-    #for i,idx in enumerate(idx):
-    #    passages.append({
-    #        "id":i,
-    #        "text":content[idx]["content"],
-    #        "meta": {"url":content[idx]["url"], "title":content[idx]["title"]}
-    #        })
+    if os.environ["RERANKER_RUNNER"] == "local":
+        # Reranker magic
+        model = CrossEncoder("cross-encoder/ettin-reranker-68m-v1")
 
-    scores = model.predict([(query, doc["content"]) for doc in content])
+        
+        scores = model.predict([(query, doc["content"]) for doc in content])
+    else:
+        results = rerank_openrouter(
+            query=query,
+            documents=[doc["content"] for doc in content],
+        )
+        # results: list of {index, relevance_score}, sorted by score desc
+        scores = [None] * len(content)
+        for r in results:
+            scores[r["index"]] = r["relevance_score"]
+    print(f"finished reranking in {time.perf_counter()-starttime}")
 
     results = []
     # constructing array from scores
@@ -108,7 +124,6 @@ def embeddings(query, results):
 
     #rerankrequest = RerankRequest(query=query, passages=passages)
     #results = ranker.rerank(rerankrequest)
-    pprint.pp(results)
 
     # reconstruct structure to be LLM friendly
     response = []
@@ -132,6 +147,7 @@ def embeddings(query, results):
     return response
 
 def websearch(query):
+    start = time.perf_counter() 
     with httpx.Client(timeout=10) as client:
         response = client.get(
             f"http://127.0.0.1:8888/search?q={query}&format=json&safesearch=0"
@@ -139,11 +155,14 @@ def websearch(query):
     data = response.json()
 
     urls = [r["url"] for r in data.get("results", [])][:15]
-    print(urls)
     if not urls:
         return []
 
-    return embeddings(query, pages(urls))
+    print(f"search query finished in {time.perf_counter()-start}")
+    pages_result = pages(urls)
+    print(f"all pages fetched in {time.perf_counter()-start}")
+
+    return embeddings(query, pages_result, start)
 
 def top_k_similar(query, results, k=None):
     q = query / np.linalg.norm(query)
@@ -153,3 +172,31 @@ def top_k_similar(query, results, k=None):
     if k is not None:
         top_idx = top_idx[:k]
     return top_idx, scores[top_idx]
+
+
+
+def rerank_openrouter(
+    query: str,
+    documents: list[str],
+    top_n: int | None = None,
+    model: str | None = None,
+) -> list[dict]:
+    model = model or os.environ["RERANKER_MODEL"]
+    payload: dict[str, object] = {
+        "model": model,
+        "query": query,
+        "documents": documents,
+    }
+    if top_n is not None:
+        payload["top_n"] = top_n
+    resp = httpx.post(
+        "https://openrouter.ai/api/v1/rerank",
+        headers={
+            "Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}",
+            "Content-Type": "application/json",
+        },
+        json=payload,
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()["results"]

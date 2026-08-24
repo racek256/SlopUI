@@ -1,0 +1,18 @@
+# Pyrefly (Python LSP / type checker) configuration.
+# Placing this file in backend/ makes Pyrefly treat backend/ as the project
+# root instead of guessing with heuristics. With search-path = ["."],
+# `stuff`, `routers`, `auth`, `DB` all resolve as top-level packages.
+project-includes = ["**/*.py*", "**/*.ipynb"]
+
+# Resolve imports relative to this directory (backend/). Do not let Pyrefly
+# guess — use exactly this search path.
+search-path = ["."]
+disable-search-path-heuristics = true
+
+# litellm ships a `py.typed` marker but re-exports its API through a
+# module-level `__getattr__` (no `.pyi` stubs), so names like `acompletion`,
+# `completion`, and `stream_chunk_builder` resolve to `object`/`NoneType` and
+# produce false-positive [not-callable] / [missing-attribute] errors at
+# runtime-correct call sites. Treat litellm as `Any` instead of trusting its
+# (unresolvable) static types.
+replace-imports-with-any = ["litellm", "litellm.*"]

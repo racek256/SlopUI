@@ -24,6 +24,7 @@ body {
   margin: 0;
   background-color: #fcf9f8; 
   overflow: hidden;
+  height: 100dvh;
 
 }
 
@@ -112,5 +113,9 @@ textarea:focus {
   position-anchor: --selector;
 
   left: anchor(center);
+
+  @variant sm {
+    left: anchor(center);
+  }
 }
 

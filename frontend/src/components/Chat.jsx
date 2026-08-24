@@ -8,7 +8,7 @@ import { useRef, useLayoutEffect } from "react";
 export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 	const [active, setActive] = useState(false)
 	const [history, updateHistory] = useState([])
-	const [model, setModel] = useState({name:"deepseek v4 flash", id:"opencode-go/deepseek-v4-flash"})
+	const [model, setModel] = useState({name:"Muse Spark 1.2", id:"opencode-go/muse-spark-1.2-contributor"})
 	const chat = useRef()
 	const prevHistoryLen = useRef(0)
 
@@ -105,7 +105,6 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 					const updated = [...prev]
 					if(updated[updated.length-1]?.reason_chain[updated[updated.length-1].reason_chain.length-1]?.type == "reason"){
 						// Push streamed text to reasoning
-						console.log("pushing to existing reasoning element")
 						let element = updated[updated.length-1].reason_chain[updated[updated.length-1]?.reason_chain.length-1]
 						element.content += content.reasoning_content
 						updated[updated.length-1].reason_chain[updated[updated.length-1]?.reason_chain.length-1] = element
@@ -228,13 +227,13 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 	}
 
 	return(
-		<div className="w-full h-screen flex-col flex py-4 pb-0 z-100 items-center overflow-hidden">
-			<div ref={chat} className={`w-full ${expanded || history.length>0 ? "h-full" : "h-1/2"}  overflow-y-scroll flex flex-col items-center transition-all duration-500 `}>
+		<div className="w-full h-dvh flex-col flex py-4 pb-0 z-100 items-center overflow-hidden">
+			<div ref={chat} className={`w-full ${expanded || history.length>0 ? "sm:h-full" : "sm:h-1/2"} h-full overflow-y-scroll flex flex-col items-center transition-all duration-500 `}>
 				<div className={`min-w-9/16 w-204 max-w-full   py-12   flex flex-col`}>
 					{history.map((e,i)=>(
 						<Message key={i} message={e}></Message>
 					))}
-					<div className="h-24 w-full  shrink-0"></div>
+					<div className="h-6 sm:h-24 w-full  shrink-0"></div>
 		
 			
 				</div>

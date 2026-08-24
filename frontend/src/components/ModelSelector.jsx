@@ -47,11 +47,11 @@ export default function ModelSelector({expanded, model, setModel}){
 					exit={{opacity:0, y:10}}
 					transition={{duration:0.05}}
 
-					 onClick={e=>{e.stopPropagation()}} className={`bg-[#fcf9f8] border-[#b8c4ff] border rounded-xl  shadow-card shadow-[#b8c4ff]/20  absolute model-selector-box w-92 h-72  ${!expanded ? "top-[anchor(bottom)]":"bottom-[anchor(top)]"} -translate-x-1/2  cursor-auto`} >
+					 onClick={e=>{e.stopPropagation()}} className={`bg-[#fcf9f8] border-[#b8c4ff] border rounded-xl  shadow-card shadow-[#b8c4ff]/20  absolute model-selector-box w-64 sm:w-92 h-72  ${!expanded ? "sm:top-[anchor(bottom)]":"sm:bottom-[anchor(top)]"} bottom-[anchor(top)]  -translate-x-1/2  cursor-auto`} >
 
 					<div  className="flex h-12 p-2">	
 						<Search className="h-full w-12"/>	
-						<input autoFocus className="grow h-full  text-xl" placeholder="Search"/>
+						<input  className="grow h-full  text-xl" placeholder="Search"/>
 						<Close className="h-full w-8 transition-all cursor-pointer hover:bg-[#b8c4ff] rounded-md" onClick={()=>{setDisplay(false)}}/>
 					</div>
 					<div className="px-2 ">	

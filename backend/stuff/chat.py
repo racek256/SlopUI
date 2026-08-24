@@ -1,7 +1,9 @@
 from stuff.chatUtils import InsertMessage, CreateChat
+from stuff.MCP.mcp_manager import SessionManager
+
 import json
 from stuff.harness import harness, title
-def chat(conn,user_id, chat_id, content, model):
+async def chat(conn,user_id, chat_id, content, model, mcp):
     cursor = conn.cursor()
     
     chat = None
@@ -44,29 +46,35 @@ def chat(conn,user_id, chat_id, content, model):
 
     # reverse the array 
     history.reverse()
+
+
+
+    # prepare MCP harness
+
+    session = await mcp.get(chat_id)
+    if session == None:
+        session = await mcp.create(user_id, chat_id)
+        await session.ensure_all()
+
+    
     
     # start harness
-    active = True 
-    g = harness(history,None,model)
+    #g = harness(history,None,model, session)
     response = None
 
 
     ### TODO: Forward streaming to router
 
-    while True: 
-        try:
-            yield next(g)
-        except StopIteration as e:
-            response = e.value  
-            break
 
-    last_message = InsertMessage(conn, user_id, chat_id, "assistant", response["content"], json.dumps(response["chain"]))
-
-    yield json.dumps({
+    async for item in harness(history, None, model, session):
+        if type(item) != str:
+            response = item
+            last_message = InsertMessage(conn, user_id, chat_id, "assistant", response["content"], json.dumps(response["chain"]))
+            yield json.dumps({
             "chat_id":chat_id
             })
+            break
 
-    return({
-        "chain":response["chain"],
-        "response":response["content"]
-        })
+        else:
+            yield item
+           

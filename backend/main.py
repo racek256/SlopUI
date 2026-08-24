@@ -13,10 +13,36 @@ from auth.user import CreateUser
 from routers.auth import router as auth_router
 from routers.chat import router as chat_router
 
-app = FastAPI()
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+
+
+# MCP stuff
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from stuff.MCP.mcp_manager import SessionManager
+
+MCP_CONFIGS = {
+    "lightpanda":  {"command": "/home/racek/.local/bin/lightpanda", "args": ["mcp"]},
+}
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.mcp = SessionManager(MCP_CONFIGS)
+    yield
+    await app.state.mcp.close_all()
+
+
+
+
+
+# router stuff
+app = FastAPI(lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(chat_router)
 
+
+# cors stuff
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -31,6 +57,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# main stuff
 def main():
     conn =initDB()
     setupDemo(conn)

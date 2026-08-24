@@ -3,7 +3,7 @@ import Search from'../Assets/search.svg?react'
 export default function Sidebar({search,chats, loadChat, newChat}){
 	console.log(chats)
 	return(
-		<section className="sidebar w-69 z-10 h-screen overflow-hidden flex flex-col items-center shrink-0 ">
+		<section className="sidebar w-69 z-10 h-screen overflow-hidden flex flex-col items-center shrink-0 sm:translate-x-0 inset-y-0 fixed -translate-x-full sm:static ">
 			{/* Heading */}
 			<div className="w-61 h-14  mt-3 bg-[#fcf9f8] shadow-card rounded-xl HeadText text-4xl flex items-center justify-center">
 				<p className="text-[#00288e]">Slop</p>

@@ -8,7 +8,7 @@ import { useRef, useLayoutEffect } from "react";
 export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 	const [active, setActive] = useState(false)
 	const [history, updateHistory] = useState([])
-	const [model, setModel] = useState({name:"Muse Spark 1.2", id:"opencode-go/muse-spark-1.2-contributor"})
+	const [model, setModel] = useState({name:"deepseek v4 flash", id:"opencode-go/deepseek-v4-flash"})
 	const chat = useRef()
 	const prevHistoryLen = useRef(0)
 

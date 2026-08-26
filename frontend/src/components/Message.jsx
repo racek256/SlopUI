@@ -39,11 +39,11 @@ export default function Message({message}){
 			>
 			<Reasoning message={message}/>	
 
-					<div className={`overflow-hidden   relative  flex prose h-max  transition-all w-full`}>
+					<div className={`overflow-hidden   relative  flex prose h-max  transition-all w-full p-0`}>
 					<div>
 			{/*<div className={`w-8 h-8   animate-spin  ${message.content != "" ? "-ml-12" : ""} m-1 transition-all bg-black loading text-base whitespace-pre-wrap`}/>*/}
 						</div>
-					<div className=" w-full inline">	
+					<div className=" w-full inline p-0">	
 						<ReactMarkdown remarkPlugins={[remarkGfm]}>	
 						{message.content}
 						</ReactMarkdown >

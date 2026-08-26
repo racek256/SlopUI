@@ -200,7 +200,7 @@ async def harness(history,request, model, session):
                         else:
                             data = "called tool does not exist"
 
-                chain.append({"role":"tool", "tool_call_id":tool.id, "content": json.dumps(data)})
+                chain.append({"role":"tool", "tool_call_id":tool.id, "content": json.dumps(data, ensure_ascii=False)})
 
         else:
             active = False

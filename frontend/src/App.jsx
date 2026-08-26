@@ -68,7 +68,7 @@ function App() {
 
 
   return (
-		<div className='flex h-dvh sm:p-0 p-2'>
+		<div className='flex h-dvh sm:p-0 '>
 		  <Sidebar search={()=>{setSearch(true)}} chats={chats} loadChat={(i)=>setChatId(i)} newChat={()=>{setChatId(null)}}/>
 		  <section className='flex justify-center  w-full min-w-0'>
 	  		{loginWindow && <Login finishLogin={()=>{location.reload()}}/>}

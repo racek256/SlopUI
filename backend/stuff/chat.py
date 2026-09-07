@@ -5,6 +5,9 @@ import json
 from stuff.harness import harness, title
 async def chat(conn,user_id, chat_id, content, model, mcp):
     cursor = conn.cursor()
+
+
+    
     
     chat = None
     if(chat_id):
@@ -15,8 +18,20 @@ async def chat(conn,user_id, chat_id, content, model, mcp):
         # calling title function here is slow and unefficent should instead start async job that renames chat later 
         chat = cursor.execute("select * from chats where id = ?",(chat_id,)).fetchone()
 
-    # Insert user message
-    last_message = InsertMessage(conn, user_id, chat_id, "user", content)
+    try:
+        cursor.execute("update users set last_model = ? where id = ?", (model, user_id))
+        cursor.execute("update chats set last_model = ? where user_id = ? and id = ?", (model, user_id, chat_id))
+    except:
+        print("updating last model failed")
+
+
+    last_message = None
+    if content != "[REGEN_USER_MESSAGE]":
+        # Insert user message
+        last_message = InsertMessage(conn, user_id, chat_id, "user", content)
+    else:
+        query = cursor.execute("select id from messages where chat_id = ? order by id desc limit 1", (chat_id,)).fetchone()
+        last_message = query["id"]
 
     # Load chat messages
     if chat is None:

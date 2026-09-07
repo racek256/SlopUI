@@ -119,3 +119,15 @@ textarea:focus {
   }
 }
 
+.reason-selector {
+  anchor-name: --some;
+}
+
+.reason-box {
+  position: absolute;
+  position-anchor: --some;
+
+  top: anchor(bottom);
+  left: anchor(left);
+}
+

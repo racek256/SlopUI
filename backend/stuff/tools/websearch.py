@@ -1,4 +1,4 @@
-import trafilatura
+import rs_trafilatura
 import time
 import os
 import httpx
@@ -38,20 +38,34 @@ def chunk_text(text, max_chars=2000, overlap=200):
                                 for i, c in enumerate(chunks[1:], 1)]
     return chunks
 
+# rs-trafilatura panics (kills the process) when extracted text exceeds its
+# hardcoded 1MB byte cap and the cut lands inside a multibyte UTF-8 char.
+# Clamp input so extracted text can never reach that cap.
+MAX_HTML_BYTES = 900_000
+
+def clamp_html(html: str) -> str:
+    data = html.encode("utf-8")
+    if len(data) <= MAX_HTML_BYTES:
+        return html
+    return data[:MAX_HTML_BYTES].decode("utf-8", "ignore")
+
 def fetch_page(client: httpx.Client, url: str):
     try:
         resp = client.get(url)
-    except httpx.HTTPError:
+        if resp.status_code != 200:
+            return None
+        result = rs_trafilatura.extract(
+            clamp_html(resp.text),
+            url=str(resp.url),        # helps page-type classification
+            output_markdown=True,
+            include_tables=True,
+        )
+        md = result.content_markdown or result.main_content
+        if not md or (result.extraction_quality or 0) < 0.5:
+            return None
+        return {"url": str(resp.url), "content": md, "title": result.title or url}
+    except Exception:
         return None
-    if resp.status_code != 200:
-        return None
-    markdown = trafilatura.extract(resp.text, output_format="markdown", include_links=True)
-    meta = trafilatura.extract_metadata(resp.text, default_url=url)
-    title = meta.title if meta and meta.title else url
-    if not markdown:
-        return None
-    return {"url": str(resp.url), "content": markdown, "title": title}
-
 
 def pages(urls):
     headers = {"User-Agent": "SlopUI-bot/0.1"}
@@ -66,7 +80,7 @@ def pages(urls):
 
 
 def embeddings(query, results, starttime):
-    print("starting embedding")
+    print("starting embedding", flush=True)
     content = []
     for result in results:
         for chunk in chunk_text(result["content"]):   
@@ -75,21 +89,22 @@ def embeddings(query, results, starttime):
     if not content:
         return []
 
-    e_query = embedding(model=os.environ["EMBEDDING_MODEL"], input=query, num_retries=3)
+    inputs = [query] + [c["content"] for c in content]
     embeds = embedding(
         model=os.environ["EMBEDDING_MODEL"],
-        input=[c["content"] for c in content],
-        num_retries=3
+        input=inputs,
+        num_retries=2,
+        timeout=30,
     )
+    e_query = embeds.data[0]
+    content_embeds = embeds.data[1:]
 
-    query_vec = np.array(e_query["data"][0]["embedding"], dtype=np.float32)
-    results_vec = np.array(
-        [item["embedding"] for item in embeds["data"]], dtype=np.float32
-    )
+    query_vec = np.array(e_query["embedding"], dtype=np.float32)
+    results_vec = np.array([item["embedding"] for item in content_embeds], dtype=np.float32)
 
     idx, scores = top_k_similar(query_vec, results_vec, 35)
 
-    print(f"finished embedding in {time.perf_counter()-starttime}, starting reranking")
+    print(f"finished embedding in {time.perf_counter()-starttime}, starting reranking", flush=True)
 
     if os.environ["RERANKER_RUNNER"] == "local":
         # Reranker magic
@@ -106,7 +121,7 @@ def embeddings(query, results, starttime):
         scores = [None] * len(content)
         for r in results:
             scores[r["index"]] = r["relevance_score"]
-    print(f"finished reranking in {time.perf_counter()-starttime}")
+    print(f"finished reranking in {time.perf_counter()-starttime}", flush=True)
 
     results = []
     # constructing array from scores
@@ -158,9 +173,9 @@ def websearch(query):
     if not urls:
         return []
 
-    print(f"search query finished in {time.perf_counter()-start}")
+    print(f"search query finished in {time.perf_counter()-start}", flush=True)
     pages_result = pages(urls)
-    print(f"all pages fetched in {time.perf_counter()-start}")
+    print(f"all pages fetched in {time.perf_counter()-start}", flush=True)
 
     return embeddings(query, pages_result, start)
 

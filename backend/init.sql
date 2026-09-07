@@ -1,12 +1,14 @@
 CREATE TABLE IF NOT EXISTS users (
 	id INTEGER PRIMARY KEY,
 	username TEXT NOT NULL UNIQUE,
-	password_hash TEXT NOT NULL
+	password_hash TEXT NOT NULL,
+	last_model TEXT
 );
 CREATE TABLE IF NOT EXISTS chats (
 	id INTEGER PRIMARY KEY,
 	user_id INTEGER NOT NULL,
 	name TEXT,
+	last_model TEXT,
 	current_message_id INTEGER,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );

@@ -70,6 +70,9 @@ web_modules/
 .env.*
 !.env.example
 
+# Local app config (may contain provider endpoints/keys, kept out of git)
+backend/config.json
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache

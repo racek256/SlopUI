@@ -3,14 +3,49 @@ import TextThing from "./TextThing"
 import Message from "./Message"
 import { useEffect } from "react"
 import { useRef, useLayoutEffect } from "react";
+import Failed from "./Failed";
 
 
 export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 	const [active, setActive] = useState(false)
 	const [history, updateHistory] = useState([])
-	const [model, setModel] = useState({name:"deepseek v4 flash", id:"opencode-go/deepseek-v4-flash"})
+	const [model, setModel] = useState({name:"loading...", id:""})
+	const [models, setModels] = useState([])
+
 	const chat = useRef()
 	const prevHistoryLen = useRef(0)
+
+
+	async function getModels(){
+		const data = await fetch("/api/chat/models")
+		if (data.ok){
+			const response = await data.json()
+			console.log(response)
+			setModels(response.models)
+			let found = -1
+			response.models.forEach((e,i) => {
+				if (e.default == true){
+					found = i
+				}
+				
+			});
+			if (found != -1){
+				setModel({
+					"id":response.models[found].id,
+					"name":response.models[found].name
+				})
+			}else{
+				setModel({
+					"id":response.models[i].id,
+					"name":response.models[i].name
+				})
+			}
+		}
+	}
+
+	useEffect(()=>{
+		getModels()
+	},[])
 
 	// Reconstruct history in current branch
 	function construct(data){
@@ -100,35 +135,42 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 				}
 				return updated
 			  })
-			}else if (content.reasoning_content){
+			}else if (content.reasoning_content) {
+			  updateHistory(prev => {
+				const updated = [...prev]
+				const lastMsg = updated[updated.length - 1]
+				const chain = lastMsg.reason_chain
+				const lastEl = chain[chain.length - 1]
+
+				let newChain
+				if (lastEl?.type === "reason") {
+				  newChain = [
+					...chain.slice(0, -1),
+					{ ...lastEl, content: lastEl.content + content.reasoning_content, startTime: lastEl.startTime }
+				  ]
+				} else {
+				  newChain = [...chain, { type: "reason", content: content.reasoning_content, startTime: Date.now() }]
+				}
+
+				updated[updated.length - 1] = { ...lastMsg, reason_chain: newChain }
+				return updated
+			  })
+			}
+			else if (content.tool_calls[0].function.name){
 				updateHistory(prev =>{
-					const updated = [...prev]
-					if(updated[updated.length-1]?.reason_chain[updated[updated.length-1].reason_chain.length-1]?.type == "reason"){
-						// Push streamed text to reasoning
-						let element = updated[updated.length-1].reason_chain[updated[updated.length-1]?.reason_chain.length-1]
-						element.content += content.reasoning_content
-						updated[updated.length-1].reason_chain[updated[updated.length-1]?.reason_chain.length-1] = element
-					}else{
-						// Push new element to array and include reasoning
+					if (prev[prev.length-1].reason_chain[prev[prev.length-1].reason_chain.length-1].type != content.tool_calls[0].function.name){
+						const updated = [...prev]
 						console.log("creating new reasoning element")
 						const element = {
-							type:"reason",
-							content:content.resoning_content
+							type:content.tool_calls[0].function.name,
+							startTime:Date.now()
 						}
 						updated[updated.length-1].reason_chain.push(element)
-					}	
-					return updated
-
-				})
-			}else if (content.tool_calls[0].function.name){
-				updateHistory(prev =>{
-					const updated = [...prev]
-					console.log("creating new reasoning element")
-					const element = {
-						type:content.tool_calls[0].function.name,
+						return updated
 					}
-					updated[updated.length-1].reason_chain.push(element)
-					return updated
+					else{
+						return prev
+					}
 				})
 
 			}
@@ -143,6 +185,13 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 		})
 
 		// Check if response okay 
+		if (!response.ok){
+			setActive(false)
+			// Nuke AI's resposne
+			const old_his = [...history]
+			old_his.pop()
+			updateHistory(old_his)
+		}
 
 
 		const reader = response.body.getReader()
@@ -193,8 +242,38 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 
 	},[history])
 
+	async function resendMessage(){
+		const oldH = [...history]
+		oldH.push({
+			role:"ai",
+			content:"",
+			reason_chain:[]
+		})
+		updateHistory(oldH)	
+		setActive(true)
+		generate("[REGEN_USER_MESSAGE]")
+		setTimeout(()=>{
+			scrollDown()
+		},500)
+	}
 	
-	function sendMessage(message){
+	async function sendMessage(message,files){
+		// File preprocessing 
+		const parsed_files = await Promise.all(files.map(async e => {
+			if (e.type.includes("text/")){
+				return { name: e.name, body: await e.text() }
+			} else if (e.type.includes("image/")){
+				const dataUrl = await new Promise((resolve, reject) => {
+					const reader = new FileReader();
+					reader.onload = () => resolve(reader.result);
+					reader.onerror = reject;
+					reader.readAsDataURL(e);
+				});
+				return { name: e.name, body: dataUrl }
+			}
+		}));
+
+
 		const oldH = [...history]
 		// add user message
 		oldH.push({
@@ -233,12 +312,14 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 					{history.map((e,i)=>(
 						<Message key={i} message={e}></Message>
 					))}
+					{/* last message = user && generating = false  */}
+					{!active && history[history?.length-1]?.role == "user" && <Failed regen={resendMessage}/>}
 					<div className="h-6 sm:h-24 w-full  shrink-0"></div>
 		
 			
 				</div>
 			</div>
-			<TextThing expanded={expanded} active={active} sendMessage={sendMessage} interrupt={interrupt} model={model} setModel={setModel}/> {/* Not centered for now fix in future*/}
+			<TextThing expanded={expanded} active={active} sendMessage={sendMessage} interrupt={interrupt} model={model} setModel={setModel} models={models}/> 
 		</div>
 	)
 }

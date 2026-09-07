@@ -43,17 +43,15 @@ function App() {
 		const token = Cookies.get("token")
 		// Verify Token validity
 		async function verifyToken(token){
-			try{
-
-			
-			const response = await fetch(`/api/auth/verify`,{
-				method:"POST",
-				headers:{"Content-Type":"application/json",},
-				body:JSON.stringify({token})
-			})
-			if (!response.ok){
-				toggleLoginWindow(true)
-			}
+			try{	
+				const response = await fetch(`/api/auth/verify`,{
+					method:"POST",
+					headers:{"Content-Type":"application/json",},
+					body:JSON.stringify({token})
+				})
+				if (!response.ok){
+					toggleLoginWindow(true)
+				}
 			}
 			catch{
 				toggleLoginWindow(true)

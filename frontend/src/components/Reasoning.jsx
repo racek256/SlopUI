@@ -1,11 +1,21 @@
+import { useState, useEffect } from 'react'
 import Search from '../Assets/search.svg?react'
 import Webfetch from '../Assets/webfetch.svg?react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useRef } from 'react'
 
 export default function Reasoning({ message }) {
+	const [hovered, setHovered] = useState(false)
 
-
-	return <div className="flex flex-col">
+	return <div className="flex flex-col reason-selector" onMouseOver={()=>{
+			setHovered(true)
+		}}
+		onMouseOut={()=>{
+			setHovered(false)
+		}}>
+		<AnimatePresence mode="wait">
+		{hovered && <ReasonHover message={message}/>}
+		</AnimatePresence>
 		<AnimatePresence mode="wait">
 			{(() => {
 				if (message?.reason_chain?.length > 0 && !message.content) {
@@ -101,4 +111,69 @@ export default function Reasoning({ message }) {
 		</AnimatePresence>
 
 	</div>
+}
+
+
+function ReasonHover(message){
+	console.log(message)
+	const now = useNow()
+
+		const reasonBar = useRef()
+
+
+	useEffect(()=>{
+		const el = reasonBar.current
+			el.scrollTo({
+				top: el.scrollHeight,
+				behavior: 'instant'
+			})
+	},[message])
+
+
+
+	return(
+		<motion.div className='reason-box w-lg h-64 rounded-xl  z-200 border-[#b8c4ff] border bg-white  max-w-9/10          shadow-2xl  shadow-gray-300'
+		initial={{
+					opacity: 0
+				}}
+				animate={{
+					opacity: 1
+				}}
+				exit={{
+					opacity: 0
+				}}
+				transition={{duration:0.1}}>
+		<div ref={reasonBar} className='flex-col p-2 text-sm overflow-y-auto h-full'>
+		{message?.message?.reason_chain?.map((e,i)=>{
+			console.log("rendering this shit")
+			console.log(e)
+			let stoptime = now
+			if (message.message.reason_chain[i+1]){
+				stoptime = message.message.reason_chain[i+1].startTime
+
+			}
+			if (e.type == "reason"){
+				return(
+					<div>{e?.content}</div>
+				)
+			}else{
+				return(
+					<div className='flex items-center'>
+						<div className='p-1 font-bold text-md'>websearch</div>
+						<p className='mx-2'>{Math.round((stoptime - e.startTime)*10/1000)/10}s</p>
+					</div>
+				)
+			}
+		})}
+		</div>
+
+		</motion.div>)
+}
+function useNow(intervalMs = 100) {
+	const [now, setNow] = useState(Date.now());
+	useEffect(() => {
+		const id = setInterval(() => setNow(Date.now()), intervalMs);
+		return () => clearInterval(id);
+	}, [intervalMs]);
+	return now;
 }

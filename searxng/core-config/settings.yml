@@ -2,39 +2,36 @@
 # SearXNG settings.yml - hardened high-volume AI-agent instance
 # ============================================================
 # Design goals:
-#   1. Engine rotation/redundancy: 8-10+ general engines enabled so a
-#      blocked engine never kills result availability.
+#   1. Engine rotation/redundancy: 25+ general engines enabled so a
+#      blocked engine never kills result availability. Stable/low-block
+#      engines are weighted higher; fragile (Google/Bing/Yahoo) lower.
 #   2. Never suspend engines on CAPTCHA/429 for long (SearxEngineCaptcha: 0)
 #      - with rotating egress the NEXT request comes from a clean IP.
-#   3. JSON API-first: formats whitelist keeps HTML rendering overhead out
+#   3. Throttle outbound to avoid triggering rate-limits:
+#      smaller pool_maxsize, retries_sleep/retry_sleep, per-engine timeouts.
+#   4. JSON API-first: formats whitelist keeps HTML rendering overhead out
 #      of the hot path; autocomplete/favicons off.
-#   4. IPv4-only outbound (source_ips: 0.0.0.0) - fixes many Google/Bing
+#   5. IPv4-only outbound (source_ips: 0.0.0.0) - fixes many Google/Bing
 #      datacenter-IP issues.
-#   5. Proxy pool support pre-wired (commented out) for egress rotation.
+#   6. User-Agent rotation is AUTOMATIC: SearXNG picks a random
+#      Chrome/Firefox UA per request from searx/data/useragents.json.
+#      No config needed; useragent_suffix stays empty to avoid fingerprinting.
+#   7. Proxy pool support pre-wired (commented out) for egress rotation.
 #
-# Verified against image 2026.8.4-c63835bd2 defaults.
+# Verified against image 2026.8.4-c63835bd2.
 # ============================================================
 
 use_default_settings:
   engines:
-    # Google web/images/videos are `inactive` (removed) by default in current
-    # versions. We re-activate web only; images/videos stay off (most-blocked).
     remove:
       - google images
       - google videos
+      - wikidata
 
 server:
-  # secret_key is injected via SEARXNG_SECRET env var (.env) - do not put it here.
-  # Public-instance / bot-defense features are intentionally OFF:
-  #   - limiter: the built-in limiter caps JSON API traffic at API_MAX=4 req/hour/IP
-  #     (hardcoded) which would throttle AI agents. For an internal AI instance
-  #     keep it off. To enable later: set limiter: true + whitelist agent IPs in
-  #     limiter.toml ([botdetection.ip_lists] pass_ip).
   limiter: false
   public_instance: false
-  # Image proxy uses memory and adds latency - not needed for AI agents.
   image_proxy: false
-  # GET makes agent calls trivially curl-able (/search?q=...&format=json).
   method: GET
   default_http_headers:
     X-Content-Type-Options: nosniff
@@ -43,137 +40,184 @@ server:
     Referrer-Policy: "no-referrer"
 
 search:
-  # 0 = no filtering. For an unfiltered AI research tool.
   safe_search: 0
-  # Autocomplete OFF - saves extra engine requests per query.
   autocomplete: ""
-  # Favicon resolver OFF - saves a lookup per result.
   favicon_resolver: ""
-  # Pin default language instead of "auto" (per-request browser sniffing).
   default_lang: "en"
-  # Whitelist of response formats. JSON is the AI workhorse; html kept for
-  # manual debugging. CSV/RSS disabled = 403, less surface.
   formats:
     - html
     - json
-  # Engine ban/suspension after failures.
   ban_time_on_fail: 5
-  max_ban_time_on_fail: 120
+  max_ban_time_on_fail: 90
   suspended_times:
-    # CRITICAL for rotation: a CAPTCHA on ONE egress IP must not kill the engine
-    # for the next request from a clean IP. 0 = never suspend on captcha.
-    # (maintainer-endorsed pattern: PR #5922)
-    SearxEngineAccessDenied: 60
+    SearxEngineAccessDenied: 30
     SearxEngineCaptcha: 0
-    SearxEngineTooManyRequests: 30
-    # Cloudflare-based engines get a short cooldown, not the default 15 days.
+    SearxEngineTooManyRequests: 60
     cf_SearxEngineCaptcha: 3600
     cf_SearxEngineAccessDenied: 3600
-    # reCAPTCHA engines: moderate cooldown.
     recaptcha_SearxEngineCaptcha: 86400
 
 outgoing:
-  # Higher than default 3.0s: slow-but-alive engines stop being counted as dead.
-  request_timeout: 6.0
+  request_timeout: 7.0
   max_request_timeout: 15.0
-  # Pool sizes for outbound httpx connections (concurrency under load).
   pool_connections: 100
-  pool_maxsize: 20
+  pool_maxsize: 10
   enable_http2: true
-  # One retry per failed request. With a proxy pool, EACH retry uses the NEXT
-  # proxy + source IP (round-robin) - this is the core of "rotation".
   retries: 1
+  retries_sleep: 1.0
+  retry_sleep: 0.8
   max_redirects: 30
-  # Force IPv4 outbound. Many engines (Google/Bing) behave badly over IPv6 from
-  # datacenter ranges. 0.0.0.0 = IPv4 only.
   source_ips: 0.0.0.0
-  # --- PROXY POOL (egress IP rotation) ---
-  # Uncomment and fill in to rotate outbound IPs. Each request picks the next
-  # proxy round-robin; each retry uses a different proxy.
-  # Works with HTTP and SOCKS5 proxies. socks5h = remote DNS (no DNS leaks).
-  # proxies:
-  #   all://:
-  #     - socks5h://user:pass@proxy1:1080
-  #     - socks5h://user:pass@proxy2:1080
-  #     - http://proxy3:8080
-  # For Tor integration: set `using_tor_proxy: true` per-engine or globally.
-
+  useragent_suffix: ""
+  extra_proxy_timeout: 5
 engines:
-  # ---- Re-enable engines that ship disabled/inactive ----
-  - name: google
-    engine: google
-    inactive: false
-    weight: 1
-    retry_on_http_error: [403, 429]
-    retries: 1
-
-  - name: bing
-    engine: bing
-    disabled: false
-    weight: 1
-    retry_on_http_error: [429]
-
+  # ================================================================
+  # TIER 1 - STABLE / LOW-BLOCK (weight 2-3, dominate results)
+  # These front-ends rarely CAPTCHA datacenter IPs.
+  # ================================================================
+  - name: duckduckgo
+    weight: 3
+    timeout: 6.0
+  - name: brave
+    weight: 3
+    timeout: 6.0
   - name: mojeek
     disabled: false
-    weight: 1
-
-  - name: yahoo
-    disabled: false
-    weight: 1
-
-  - name: yep
-    disabled: false
-    weight: 1
-
-  # ---- Weight the stable engines higher so their results dominate ----
-  - name: duckduckgo
-    weight: 2
-
-  - name: brave
-    weight: 2
-
+    weight: 3
+    timeout: 6.0
   - name: qwant
     disabled: false
     weight: 2
-
+    timeout: 6.0
+  - name: mwmbl
+    disabled: false
+    weight: 2
+    timeout: 7.0
+  - name: crowdview
+    disabled: false
+    weight: 2
+    timeout: 7.0
+  - name: yep
+    disabled: false
+    weight: 2
+    timeout: 6.0
+  - name: wiby
+    disabled: false
+    weight: 2
+    timeout: 6.0
+  - name: sepiasearch
+    disabled: false
+    weight: 2
+    timeout: 6.0
+  - name: yacy
+    disabled: false
+    weight: 1
+    timeout: 7.0
+  - name: swisscows
+    disabled: false
+    weight: 2
+    timeout: 6.0
+  - name: privacywall
+    disabled: false
+    weight: 2
+    timeout: 6.0
+  - name: searchmysite
+    disabled: false
+    weight: 1
+    timeout: 7.0
+  # ================================================================
+  # TIER 2 - MODERATE / SPECIALTY (weight 1, good fallback)
+  # ================================================================
   - name: startpage
     weight: 1
-
+    timeout: 7.0
   - name: wikipedia
     weight: 1
-
-  - name: wikidata
+    timeout: 5.0
+  - name: openverse
     weight: 1
-
+    timeout: 6.0
   - name: github
     inactive: false
     weight: 1
-
+    timeout: 5.0
+  - name: stackoverflow
+    disabled: false
+    weight: 1
+    timeout: 6.0
+  - name: openstreetmap
+    disabled: false
+    weight: 1
+    timeout: 6.0
   - name: arxiv
     weight: 1
-
-  - name: google news
-    inactive: false
+    timeout: 6.0
+  - name: semantic scholar
+    disabled: false
     weight: 1
-
-  - name: google cse
+    timeout: 7.0
+  - name: openalex
+    disabled: false
     weight: 1
-
-  - name: google scholar
+    timeout: 7.0
+  - name: crossref
+    disabled: false
     weight: 1
-
+    timeout: 7.0
+  - name: pubmed
+    disabled: false
+    weight: 1
+    timeout: 7.0
   - name: docker hub
     weight: 1
+    timeout: 6.0
+  # ================================================================
+  # TIER 3 - FRAGILE / EASILY BLOCKED (weight 0.3-0.5, fast-fail)
+  # Kept for redundancy but de-prioritized. Fast-fail so they don't
+  # stall the whole query when blocked.
+  # ================================================================
+  - name: google
+    engine: google
+    inactive: false
+    weight: 0.5
+    timeout: 4.5
+    retry_on_http_error: [403, 429]
+    retries: 1
+  - name: bing
+    engine: bing
+    disabled: false
+    weight: 0.5
+    timeout: 4.5
+    retry_on_http_error: [429]
+  - name: yahoo
+    disabled: false
+    weight: 0.5
+    timeout: 4.5
+    retry_on_http_error: [429]
+  - name: yahoo news
+    disabled: false
+    weight: 0.3
+    timeout: 4.5
+  - name: google news
+    inactive: false
+    weight: 0.5
+    timeout: 4.5
+  - name: google scholar
+    weight: 0.5
+    timeout: 4.5
+  - name: google cse
+    weight: 0.3
+    timeout: 4.5
+  - name: yandex
+    disabled: false
+    weight: 0.5
+    timeout: 4.5
+    retry_on_http_error: [429]
+  - name: mojeek images
+    disabled: false
+    weight: 0.3
+    timeout: 5.0
 
-  - name: openverse
-    weight: 1
-
-# Lock preferences so agents cannot accidentally change formats/language
-# per-request via cookies (stable, deterministic behavior).
-# Valid enum values (settings_schema): categories, language, locale,
-# autocomplete, favicon_resolver, image_proxy, method, safesearch, theme,
-# results_on_new_tab, doi_resolver, simple_style, center_alignment,
-# query_in_title, search_on_category_select.
 preferences:
   lock:
     - autocomplete

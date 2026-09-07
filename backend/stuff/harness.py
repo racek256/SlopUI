@@ -11,27 +11,26 @@ from litellm.llms.openai_like.json_loader import JSONProviderRegistry, SimplePro
 from litellm import experimental_mcp_client
 from litellm.exceptions import Timeout
 from exa_py import Exa
+import litellm; litellm.drop_params=True
 
 
-# TODO: load dinamically from config.json
+
+
+# load dinamically from config.json
 JSONProviderRegistry.load()  # ensure existing ones are loaded first
-JSONProviderRegistry._providers["opencode-zen"] = SimpleProviderConfig(
-    "opencode-zen",
-    {
-        "base_url": "https://opencode.ai/zen/v1",
-        "api_key_env": "OPENCODE_ZEN_API_KEY",
-    },
-)
-
-JSONProviderRegistry.load()  # ensure existing ones are loaded first
-JSONProviderRegistry._providers["opencode-go"] = SimpleProviderConfig(
-    "opencode-go",
-    {
-        "base_url": "https://opencode.ai/zen/go/v1",
-        "api_key_env": "OPENCODE_GO_API_KEY",
-    },
-)
-
+with open('config.json','r') as f:
+    data = json.load(f)
+    providers = data["allowed_models"]
+    for provider in providers:
+        if provider["format"] == "openai":
+            print(f"Loading provider {provider['provider']}")
+            JSONProviderRegistry._providers[provider["provider"]] = SimpleProviderConfig(
+                provider["provider"],
+                {
+                    "base_url": provider["baseURL"],
+                    "api_key_env": provider["api_key_env"],
+                },
+            )
 # TODO: Figure some better placement for this JSON blob
 tools = [
     {
@@ -56,7 +55,9 @@ tools = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "url": {"type": "string", "description": "url of any page"}
+                    "url": {"type": "string", "description": "url of any page"},
+                    "format":{"type":"string", "description": "choice between markdown|html defaults to markdown"},
+                    "include_links":{"type":"boolean", "description": "include text links in result"}
                 },
                 "required": ["url"]
             }
@@ -151,15 +152,15 @@ async def harness(history,request, model, session):
                 msg["reasoning_content"] = ""
         print(messages)
         print("Starting round of harness")
-        response = await acompletion(model, messages, tools=session_tools, stream=True)
+        response = await acompletion(model, messages, tools=session_tools, stream=True, num_retries=3)
         chunks = []
 
-
+        #
         try:
             while True:
                 try:
-                    # 15s idle = freeze detector, not slowness detector
-                    chunk = await asyncio.wait_for(response.__anext__(), timeout=15.0)
+                    #chunk = await asyncio.wait_for(response.__anext__(), timeout=15.0)
+                    chunk = await response.__anext__()
                 except StopAsyncIteration:
                     break
                 except asyncio.TimeoutError:
@@ -168,7 +169,6 @@ async def harness(history,request, model, session):
                 chunks.append(chunk)
                 yield chunk["choices"][0]["delta"].model_dump_json() + "\n"
         except Timeout:
-            # abort harness round, trigger retry/fallback
             raise
 
 
@@ -178,29 +178,35 @@ async def harness(history,request, model, session):
 
         if message.tool_calls:
             for tool in message.tool_calls:
-                print(f"Agent has called tool {tool.function.name}")
-                print("list of tools to choose from")
-                print(session_tools)
-                print(tool.function.arguments)
-                args = json.loads(tool.function.arguments)
-                match tool.function.name:
-                    case "websearch":
-                        data = None
-                        if os.environ["SEARCH_PROVIDER"] == "local":
-                            data = websearch(args["query"])
-                        else:
-                            data = remotewebsearch(args["query"])
-                        print(data)
-                    case "webfetch":
-                        data = webfetch(args["url"])
-                    case _:
-                        if tool.function.name in [t["function"]["name"] for t in session_tools]:
-                            data = await session.execute(tool.function.name, args)
+                try:
+                    print(f"Agent has called tool {tool.function.name}")
+                    print("list of tools to choose from")
+                    print(session_tools)
+                    print(tool.function.arguments)
+                    args = json.loads(tool.function.arguments)
+                    match tool.function.name:
+                        case "websearch":
+                            data = None
+                            if os.environ["SEARCH_PROVIDER"] == "local":
+                                data = websearch(args["query"])
+                            else:
+                                data = remotewebsearch(args["query"])
                             print(data)
-                        else:
-                            data = "called tool does not exist"
+                        case "webfetch":
+                            data = webfetch(**args)
+                        case _:
+                            if tool.function.name in [t["function"]["name"] for t in session_tools]:
+                                data = await session.execute(tool.function.name, args)
+                                print(data)
+                            else:
+                                data = "called tool does not exist"
 
-                chain.append({"role":"tool", "tool_call_id":tool.id, "content": json.dumps(data, ensure_ascii=False)})
+                    chain.append({"role":"tool", "tool_call_id":tool.id, "content": json.dumps(data, ensure_ascii=False)})
+                except Exception as e:
+                    print(str(Exception))
+                    chain.append({"role":"tool", "tool_call_id":tool.id, "content": "Tool call has failed"})
+
+
 
         else:
             active = False
@@ -218,7 +224,7 @@ Rules:
 - Output ONLY the title, nothing else (no quotes, no punctuation at the end, no preamble like "Title:")
 - 1-4 words, shorter is better
 - Not a full sentence — a label, like a tab title or search query
-- Match the language of the input (Czech in, Czech title; English in, English title)
+- Match the language of the input 
 - Never leave it looking cut off mid-word
 """
 

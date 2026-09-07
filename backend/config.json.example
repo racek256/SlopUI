@@ -1,0 +1,15 @@
+{
+	"allowed_models":[
+		{
+			"provider":"openrouter",
+			"models":[
+				{"id":"openrouter/openai/gpt-4o-mini","name":"gpt-4o mini"},
+				{"id":"openrouter/anthropic/claude-3.5-haiku","name":"claude 3.5 haiku"},
+				{"id":"openrouter/google/gemini-2.0-flash-001","name":"gemini 2.0 flash"},
+				{"id":"openrouter/meta-llama/llama-3.3-70b-instruct","name":"llama 3.3 70b"}
+			],
+			"format":"builtin",
+			"api_key_env":"OPENROUTER_API_KEY"
+		}
+	]
+}

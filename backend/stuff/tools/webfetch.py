@@ -1,5 +1,8 @@
 import httpx
+import logging
 import rs_trafilatura
+
+logger = logging.getLogger(__name__)
 
 # rs-trafilatura panics (kills the process) when extracted text exceeds its
 # hardcoded 1MB byte cap and the cut lands inside a multibyte UTF-8 char.
@@ -40,6 +43,6 @@ def webfetch(url: str, format:str = "markdown", include_links: bool = False):
             "body": markdown,
         }
     except Exception as e:
-        print(e)
-        raise Exception(e)
+        logger.exception("webfetch failed for %s", url)
+        raise
     

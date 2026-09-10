@@ -1,5 +1,6 @@
 from stuff.tools.webfetch import webfetch
 from dataclasses import asdict
+import logging
 import random
 import asyncio
 from litellm import acompletion, completion, stream_chunk_builder
@@ -12,6 +13,9 @@ from litellm import experimental_mcp_client
 from litellm.exceptions import Timeout
 from exa_py import Exa
 import litellm; litellm.drop_params=True
+litellm.suppress_debug_info = True
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -23,7 +27,7 @@ with open('config.json','r') as f:
     providers = data["allowed_models"]
     for provider in providers:
         if provider["format"] == "openai":
-            print(f"Loading provider {provider['provider']}")
+            logger.info(f"Loading provider {provider['provider']}")
             JSONProviderRegistry._providers[provider["provider"]] = SimpleProviderConfig(
                 provider["provider"],
                 {
@@ -143,15 +147,14 @@ async def harness(history,request, model, session):
 
 
     # include MCP tools
-    print(session.all_tools())
+    logger.debug("MCP tools: %s", [t["function"]["name"] for t in session.all_tools()])
     session_tools = tools + session.all_tools()
     while active:
         messages = [{"role":"system", "content":system_prompt}] + history + ([{"role":"user","content":request}] if request else []) + chain
         for msg in messages:
             if msg.get("role") == "assistant" and "reasoning_content" not in msg:
                 msg["reasoning_content"] = ""
-        print(messages)
-        print("Starting round of harness")
+        logger.debug("harness round starting (model=%s, messages=%d)", model, len(messages))
         response = await acompletion(model, messages, tools=session_tools, stream=True, num_retries=3)
         chunks = []
 
@@ -179,10 +182,8 @@ async def harness(history,request, model, session):
         if message.tool_calls:
             for tool in message.tool_calls:
                 try:
-                    print(f"Agent has called tool {tool.function.name}")
-                    print("list of tools to choose from")
-                    print(session_tools)
-                    print(tool.function.arguments)
+                    logger.info("tool call: %s", tool.function.name)
+                    logger.debug("tool args: %s", tool.function.arguments)
                     args = json.loads(tool.function.arguments)
                     match tool.function.name:
                         case "websearch":
@@ -191,19 +192,19 @@ async def harness(history,request, model, session):
                                 data = websearch(args["query"])
                             else:
                                 data = remotewebsearch(args["query"])
-                            print(data)
+                            logger.debug("tool result: %.500s", str(data))
                         case "webfetch":
                             data = webfetch(**args)
                         case _:
                             if tool.function.name in [t["function"]["name"] for t in session_tools]:
                                 data = await session.execute(tool.function.name, args)
-                                print(data)
+                                logger.debug("tool result: %.500s", str(data))
                             else:
                                 data = "called tool does not exist"
 
                     chain.append({"role":"tool", "tool_call_id":tool.id, "content": json.dumps(data, ensure_ascii=False)})
                 except Exception as e:
-                    print(str(Exception))
+                    logger.exception("tool %s failed", tool.function.name)
                     chain.append({"role":"tool", "tool_call_id":tool.id, "content": "Tool call has failed"})
 
 
@@ -211,7 +212,8 @@ async def harness(history,request, model, session):
         else:
             active = False
 
-
+    
+    logger.info("request finished without errors")
     yield({
         "chain":chain,
         "content":chain[-1]["content"]

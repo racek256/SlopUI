@@ -1,5 +1,3 @@
-import { useEffect } from "react"
-import { useState } from "react"
 
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -16,7 +14,7 @@ export default function Message({message}){
 		  initial={!message.instant && { opacity: 0, y: 10 }}
 		  animate={{ opacity: 1, y: 0 }}
 		>
-		  <p className="whitespace-pre-wrap break-words">
+		  <p className="whitespace-pre-wrap wrap-break-words">
 			{message.content}
 		  </p>
 		</motion.div>
@@ -37,8 +35,7 @@ export default function Message({message}){
 				delay:1
 			}}
 			>
-			<Reasoning message={message}/>	
-
+						<Reasoning message={message}/>	
 					<div className={`overflow-hidden   relative  flex prose h-max  transition-all w-full p-0`}>
 					<div>
 			{/*<div className={`w-8 h-8   animate-spin  ${message.content != "" ? "-ml-12" : ""} m-1 transition-all bg-black loading text-base whitespace-pre-wrap`}/>*/}
@@ -47,6 +44,7 @@ export default function Message({message}){
 						<ReactMarkdown remarkPlugins={[remarkGfm]}>	
 						{message.content}
 						</ReactMarkdown >
+
 					</div>
 				</div>
 							

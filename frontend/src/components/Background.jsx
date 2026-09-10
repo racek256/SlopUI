@@ -22,7 +22,7 @@ export default function Background({expanded}){
 	return(
 		<div ref={divRef} className="overflow-hidden h-full w-full flex shrink-0 absolute z-0 ">
 			{items.map((_,i)=>(
-				<div key={i} className={`h-screen w-1  rotate-12 mr-14 shrink-0  bg-gradient ${expanded ? "bg-gradient-active" : ""}`}>
+				<div key={i} className={`h-[101vh] w-1  rotate-12 mr-14 shrink-0  bg-gradient ${expanded ? "bg-gradient-active" : ""}`}>
 				</div>
 			))}
 		</div>

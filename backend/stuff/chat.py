@@ -1,8 +1,24 @@
-from stuff.chatUtils import InsertMessage, CreateChat
+from stuff.chatUtils import InsertMessage, CreateChat, RenameChat
 from stuff.MCP.mcp_manager import SessionManager
-
+import logging
+from stuff.generations import publish, DONE
+from DB.connection import get_conn
 import json
 from stuff.harness import harness, title
+import sqlite3
+
+logger = logging.getLogger(__name__)
+
+async def run_generation(gen, conn,user_id, chat_id, content, model, mcp):
+    conn = sqlite3.connect("db.db", check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    async for item in chat(conn, user_id, chat_id, content, model, mcp):
+        publish(gen, item)
+    publish(gen, DONE)
+                
+                
+
+
 async def chat(conn,user_id, chat_id, content, model, mcp):
     cursor = conn.cursor()
 
@@ -13,6 +29,8 @@ async def chat(conn,user_id, chat_id, content, model, mcp):
     if(chat_id):
         # Verify chat existence
         chat = cursor.execute("select * from chats where id = ?",(chat_id,)).fetchone()
+        if chat["current_message_id"] is None:
+            RenameChat(conn, user_id, chat_id, title(content))
     else:
         chat_id = CreateChat(conn, user_id, title(content)) 
         # calling title function here is slow and unefficent should instead start async job that renames chat later 
@@ -22,7 +40,7 @@ async def chat(conn,user_id, chat_id, content, model, mcp):
         cursor.execute("update users set last_model = ? where id = ?", (model, user_id))
         cursor.execute("update chats set last_model = ? where user_id = ? and id = ?", (model, user_id, chat_id))
     except:
-        print("updating last model failed")
+        logger.warning("updating last model failed")
 
 
     last_message = None
@@ -35,7 +53,7 @@ async def chat(conn,user_id, chat_id, content, model, mcp):
 
     # Load chat messages
     if chat is None:
-        print("nope replace with error later")
+        logger.warning("nope replace with error later")
     messages = cursor.execute("select * from messages where chat_id = ?",(chat_id,)).fetchall()
     # Rebuilding chat array
 

@@ -1,12 +1,95 @@
 import rs_trafilatura
+import logging
 import time
 import os
 import httpx
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
-from litellm import embedding, rerank 
+from litellm import embedding, rerank
 from sentence_transformers import CrossEncoder
 import re
+
+logger = logging.getLogger(__name__)
+
+# upstream embedding provider (pplx-embed via OpenRouter) limits per request:
+# max 512 items AND max 120,000 total tokens. The old estimator assumed
+# ~2 chars/token, but token-dense text (code, CJK, markdown symbols) can be
+# close to ~1 char/token, so a "100k estimated" batch could actually be
+# ~150k+ tokens and 400. Assume worst case 1 char ~= 1 token and keep a
+# large headroom below the 120k cap. Individual inputs are hard-truncated
+# so one monster chunk can never blow a batch, and batches that still get
+# rejected are recursively halved.
+EMBED_MAX_ITEMS = 128
+EMBED_TOKEN_BUDGET = 60_000
+EMBED_CHARS_PER_TOKEN = 1
+MAX_EMBED_CHARS = 2000
+MAX_QUERY_CHARS = 2000
+
+
+def _truncate(s: str, limit: int) -> str:
+    return s[:limit] if len(s) > limit else s
+
+
+def batch_embed_inputs(inputs):
+    batches = []
+    cur, cur_tokens = [], 0
+    for raw in inputs:
+        item = _truncate(raw, MAX_EMBED_CHARS)
+        est = max(1, len(item) // EMBED_CHARS_PER_TOKEN)
+        # single item must never exceed the budget on its own
+        if est > EMBED_TOKEN_BUDGET:
+            item = _truncate(item, EMBED_TOKEN_BUDGET * EMBED_CHARS_PER_TOKEN)
+            est = max(1, len(item) // EMBED_CHARS_PER_TOKEN)
+        if cur and (len(cur) >= EMBED_MAX_ITEMS or cur_tokens + est > EMBED_TOKEN_BUDGET):
+            batches.append(cur)
+            cur, cur_tokens = [], 0
+        cur.append(item)
+        cur_tokens += est
+    if cur:
+        batches.append(cur)
+    return batches
+
+
+def _is_token_limit_error(e: Exception) -> bool:
+    msg = str(e).lower()
+    return ("exceeds maximum" in msg or "maximum is" in msg) and "token" in msg
+
+
+def _embed_batches(model: str, batches):
+    """Embed batches, recursively halving any batch the provider rejects
+    for exceeding its token limit. Returns flat list of data items."""
+    from litellm.exceptions import BadRequestError
+
+    data = []
+    queue = list(batches)
+    while queue:
+        batch = queue.pop(0)
+        if not batch:
+            continue
+        try:
+            embeds = embedding(
+                model=model,
+                input=batch,
+                num_retries=2,
+                timeout=30,
+            )
+            data.extend(embeds.data)
+        except BadRequestError as e:
+            if len(batch) == 1:
+                # single truncated input still too big: halve its chars and retry
+                item = batch[0]
+                if len(item) <= 1 or not _is_token_limit_error(e):
+                    raise
+                logger.warning("single embed input rejected, halving %d chars", len(item))
+                queue.insert(0, [item[: len(item) // 2]])
+            elif _is_token_limit_error(e):
+                mid = len(batch) // 2
+                logger.warning("embed batch rejected (%d items), splitting %d/%d", len(batch), mid, len(batch) - mid)
+                queue.insert(0, batch[mid:])
+                queue.insert(0, batch[:mid])
+            else:
+                raise
+    return data
 
 
 def chunk_text(text, max_chars=2000, overlap=200):
@@ -80,7 +163,7 @@ def pages(urls):
 
 
 def embeddings(query, results, starttime):
-    print("starting embedding", flush=True)
+    logger.debug("starting embedding")
     content = []
     for result in results:
         for chunk in chunk_text(result["content"]):   
@@ -89,47 +172,48 @@ def embeddings(query, results, starttime):
     if not content:
         return []
 
-    inputs = [query] + [c["content"] for c in content]
-    embeds = embedding(
-        model=os.environ["EMBEDDING_MODEL"],
-        input=inputs,
-        num_retries=2,
-        timeout=30,
-    )
-    e_query = embeds.data[0]
-    content_embeds = embeds.data[1:]
+    inputs = [_truncate(query, MAX_QUERY_CHARS)] + [
+        _truncate(c["content"], MAX_EMBED_CHARS) for c in content
+    ]
+    data = _embed_batches(os.environ["EMBEDDING_MODEL"], batch_embed_inputs(inputs))
+    e_query = data[0]
+    content_embeds = data[1:]
 
     query_vec = np.array(e_query["embedding"], dtype=np.float32)
     results_vec = np.array([item["embedding"] for item in content_embeds], dtype=np.float32)
 
-    idx, scores = top_k_similar(query_vec, results_vec, 35)
+    idx, _ = top_k_similar(query_vec, results_vec, 35)
 
-    print(f"finished embedding in {time.perf_counter()-starttime}, starting reranking", flush=True)
+    # embedding narrowed all chunks down to the 35 most similar —
+    # reranker only judges those
+    rerank_docs = [content[i] for i in idx]
+
+    logger.debug(f"finished embedding in {time.perf_counter()-starttime}, starting reranking")
 
     if os.environ["RERANKER_RUNNER"] == "local":
         # Reranker magic
         model = CrossEncoder("cross-encoder/ettin-reranker-68m-v1")
 
         
-        scores = model.predict([(query, doc["content"]) for doc in content])
+        scores = model.predict([(query, doc["content"]) for doc in rerank_docs])
     else:
         results = rerank_openrouter(
             query=query,
-            documents=[doc["content"] for doc in content],
+            documents=[doc["content"] for doc in rerank_docs],
         )
         # results: list of {index, relevance_score}, sorted by score desc
-        scores = [None] * len(content)
+        scores = [None] * len(rerank_docs)
         for r in results:
             scores[r["index"]] = r["relevance_score"]
-    print(f"finished reranking in {time.perf_counter()-starttime}", flush=True)
+    logger.debug(f"finished reranking in {time.perf_counter()-starttime}")
 
     results = []
     # constructing array from scores
     for i, score in enumerate(scores):
         results.append({
-            "url":content[i]["url"],
-            "title":content[i]["title"],
-            "content":content[i]["content"],
+            "url":rerank_docs[i]["url"],
+            "title":rerank_docs[i]["title"],
+            "content":rerank_docs[i]["content"],
             "score":score
             })
     results.sort(key=lambda r: r["score"], reverse=True)
@@ -173,9 +257,9 @@ def websearch(query):
     if not urls:
         return []
 
-    print(f"search query finished in {time.perf_counter()-start}", flush=True)
+    logger.debug(f"search query finished in {time.perf_counter()-start}")
     pages_result = pages(urls)
-    print(f"all pages fetched in {time.perf_counter()-start}", flush=True)
+    logger.debug(f"all pages fetched in {time.perf_counter()-start}")
 
     return embeddings(query, pages_result, start)
 

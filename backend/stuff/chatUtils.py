@@ -30,7 +30,7 @@ def InsertMessage(conn, user_id, chat_id, role, content, chain=None):
     return message_id
 
 def RenameChat(conn, user_id, chat_id, new_name):
-    cursor = conn.curosr()
+    cursor = conn.cursor()
     chat = cursor.execute("select user_id from chats where id = ?", (chat_id,)).fetchone()
     if chat["user_id"] != user_id:
         return Error("user is not owner of this chat","permission")

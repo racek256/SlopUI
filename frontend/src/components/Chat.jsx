@@ -117,7 +117,7 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 
 
 	// AI request
-	async function generate(content){	
+	async function generate(activeChatID){	
 
 		function onObject(content) {
 			console.log(content)
@@ -126,16 +126,39 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 				setChatID(content.chat_id)
 				setActive(false)
 			}else if (content.content){
+				// Received response
 			  updateHistory(prev => {
+				// Add resposne to message
 				const updated = [...prev]
 				const last = updated[updated.length - 1]
 				updated[updated.length - 1] = {
 				  ...last,
 				  content: last.content + content.content
 				}
+				// Add response to reasoning chain
+				const lastMsg = updated[updated.length - 1]
+				const chain = lastMsg.reason_chain
+				const lastEl = chain[chain.length - 1]
+
+				let newChain
+				if (lastEl?.type === "response") {
+			      // El exists
+				  newChain = [
+					...chain.slice(0, -1),
+					{ ...lastEl, content: lastEl.content + content.reasoning_content, startTime: lastEl.startTime }
+				  ]
+				} else {
+				  // creating new Response El
+				  newChain = [...chain, { type: "response", content: content.reasoning_content, startTime: Date.now() }]
+				}
+				updated[updated.length - 1] = { ...lastMsg, reason_chain: newChain }
+
+
+
 				return updated
 			  })
 			}else if (content.reasoning_content) {
+				// Received reasoning
 			  updateHistory(prev => {
 				const updated = [...prev]
 				const lastMsg = updated[updated.length - 1]
@@ -144,11 +167,13 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 
 				let newChain
 				if (lastEl?.type === "reason") {
+			      // Reasoning El exists
 				  newChain = [
 					...chain.slice(0, -1),
 					{ ...lastEl, content: lastEl.content + content.reasoning_content, startTime: lastEl.startTime }
 				  ]
 				} else {
+				  // Create new reasoning el
 				  newChain = [...chain, { type: "reason", content: content.reasoning_content, startTime: Date.now() }]
 				}
 
@@ -156,7 +181,8 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 				return updated
 			  })
 			}
-			else if (content.tool_calls[0].function.name){
+			else if (content?.tool_calls != null && content.tool_calls[0]?.function?.name){
+				// Received Tool call
 				updateHistory(prev =>{
 					if (prev[prev.length-1].reason_chain[prev[prev.length-1].reason_chain.length-1].type != content.tool_calls[0].function.name){
 						const updated = [...prev]
@@ -177,10 +203,10 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 		}
 
 		console.log(chat_id)
-		const response = await fetch(`/api/chat/send`,{
+		const response = await fetch(`/api/chat/get_stream`,{
 			method:"POST",
 			headers:{"Content-Type":"application/json"},
-			body:JSON.stringify({content,chat_id:chat_id?.toString(),model:model.id}),
+			body:JSON.stringify({chat_id:activeChatID.toString()}),
 			credentials:"include"
 		})
 
@@ -251,7 +277,21 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 		})
 		updateHistory(oldH)	
 		setActive(true)
-		generate("[REGEN_USER_MESSAGE]")
+		const response = await fetch(`/api/chat/send`,{
+			method:"POST",
+			headers:{"Content-Type":"application/json"},
+			body:JSON.stringify({content:"[REGEN_USER_MESSAGE]",chat_id:chat_id?.toString(),model:model.id}),
+			credentials:"include"
+		})
+		if (!response.ok){
+			console.error("kabbom big no request careated")
+		}
+		const new_chatid = (await response.json()).gen_id
+		if (new_chatid != chat_id){
+			//setChatID(new_chatid)
+		}
+		generate(new_chatid)
+
 		setTimeout(()=>{
 			scrollDown()
 		},500)
@@ -289,7 +329,24 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 		updateHistory(oldH)	
 		setActive(true)
 
-		generate(message)
+		// create request
+		const response = await fetch(`/api/chat/send`,{
+			method:"POST",
+			headers:{"Content-Type":"application/json"},
+			body:JSON.stringify({content:message,chat_id:chat_id?.toString(),model:model.id}),
+			credentials:"include"
+		})
+		if (!response.ok){
+			console.error("kabbom big no request careated")
+		}
+		const new_chatid = (await response.json()).gen_id
+		if (new_chatid != chat_id){
+			//setChatID(new_chatid)
+		}
+		
+
+		// signup for stream
+		generate(new_chatid)
 		setTimeout(()=>{
 			scrollDown()
 		},500)

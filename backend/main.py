@@ -2,12 +2,18 @@
 ## One day this file will contain backend
 import bcrypt
 from dotenv import load_dotenv
+import logging
 import os
 import uvicorn
 import sqlite3
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 load_dotenv('../.env')
+
+from stuff.logging_setup import setup_logging
+setup_logging()
+
+logger = logging.getLogger(__name__)
 
 from auth.user import CreateUser 
 from routers.auth import router as auth_router
@@ -67,7 +73,7 @@ def main():
 
 def initDB():
     if not os.path.exists("db.db"):
-        print("DB not found creating new")
+        logger.info("DB not found creating new")
     f = open("init.sql")
     init = f.read()
     conn = sqlite3.connect('db.db')
@@ -76,7 +82,7 @@ def initDB():
     cursor.executescript(init)
     # dev env check
     if(os.path.exists("dev.sql")):
-        print("Dev enviroment was found and activated")
+        logger.info("Dev enviroment was found and activated")
         f = open("dev.sql")
         dev = f.read()
         cursor.executescript(dev)

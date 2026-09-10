@@ -1,8 +1,11 @@
 from fastapi.responses import JSONResponse
 from fastapi import FastAPI, Depends, Request, HTTPException, Cookie, APIRouter
 from pydantic import BaseModel
-from auth.user import CreateUser, LoginUser, VerifyToken, Error 
+from auth.user import CreateUser, LoginUser, VerifyToken, Error
 from DB.connection import get_conn
+import logging
+
+logger = logging.getLogger(__name__)
 
 class UserData(BaseModel):
     username: str 
@@ -14,7 +17,7 @@ async def authenticate(request: Request):
     request.state.user = None
     try:
         token = request.cookies.get("token")
-        print(request.cookies)
+        logger.debug(request.cookies)
         if token:
             return(VerifyToken(token))
         else:
@@ -51,7 +54,7 @@ def LoginUserEndpoint(data: UserData, conn = Depends(get_conn)):
         )
         return response
     except Error as e:
-        print(e.error_type)
+        logger.error(e.error_type)
         if e.error_type == "auth_failure":
             return JSONResponse(content={"error": "wrong password"}, status_code=401)
         elif e.error_type == "not_found":
@@ -65,7 +68,7 @@ def LoginUserEndpoint(data:UserData, conn = Depends(get_conn)):
         result = LoginUser(conn, data.username, data.password)
         return JSONResponse(content={"success":True, "token":result}, status_code=200)
     except Error as e:
-        print(e.error_type)
+        logger.error(e.error_type)
         if(e.error_type == "auth_failure"):
             return JSONResponse(content={"error":"wrong password"},status_code=401)
         elif e.error_type == "not_found":

@@ -6,6 +6,7 @@ import { useRef } from 'react'
 
 export default function Reasoning({ message }) {
 	const [hovered, setHovered] = useState(false)
+	console.log(message)
 
 	return <div className="flex flex-col reason-selector" onMouseOver={()=>{
 			setHovered(true)
@@ -18,7 +19,7 @@ export default function Reasoning({ message }) {
 		</AnimatePresence>
 		<AnimatePresence mode="wait">
 			{(() => {
-				if (message?.reason_chain?.length > 0 && !message.content) {
+				if (message?.reason_chain?.length > 0 && message?.reason_chain[message?.reason_chain?.length-1]?.type != "response") {
 					const reason = message.reason_chain[message.reason_chain.length - 1]
 					console.log("reason chain element")
 					console.log(reason)

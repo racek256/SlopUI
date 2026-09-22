@@ -1,0 +1,32 @@
+app:
+  demo_mode: false # allows creating temp accounts
+  log_level: debug
+  search_provider: local # local|remote
+search:
+  provider: local # local/remote
+  litellm: disabled # if remote
+  exa: disabled # if remote
+embedding: # only used when search provider is local
+  runner: remote
+  model: "openrouter/perplexity/pplx-embed-v1-0.6b"
+  search_limit: 20
+reranker: # only used when search provider is local
+  runner: openrouter # currently openrouter is only supported provider 
+  model: "cohere/rerank-4-fast"
+  chunks_limit: 35 # amount of chunks that can enter reranker (sorted)
+models:
+  - provider: openrouter
+    format: builtin
+    api_key_env: OPENROUTER_API_KEY # <-- only reference, value stays in .env
+    models: [{id: "openrouter/qwen/qwen3.7-flash", name: "Qwen 3.7 flash"}]
+  - provider: opencode-go
+    baseURL: https://opencode.ai/zen/go/v1
+    format: openai
+    api_key_env: OPENCODE_GO_API_KEY
+    models: [{id: "opencode-go/glm-5.3-flash", name: "GLM 5.3 flash"}, {id: "opencode-go/deepseek-v4.1-flash", name: "deepseek v4.1 flash"}]
+MCPS:
+  - name: lightpanda
+    command: "/home/racek/.local/bin/lightpanda"
+    args:
+      - mcp
+  

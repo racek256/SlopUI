@@ -15,6 +15,33 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 	const chat = useRef()
 	const prevHistoryLen = useRef(0)
 
+	const [failed, setFailed] = useState(false)
+
+	useEffect(()=>{
+		if (!active && history?.length > 0 && history[history?.length-1]?.role == "user" && !failed ){
+			// Attempt to register stream
+			if(chat_id){
+				const oldH = [...history]	
+				// add AI message
+				oldH.push({
+					role:"ai",
+					content:"",
+					reason_chain:[]
+				})
+				setActive(true)
+				updateHistory(oldH)
+				generate(chat_id)
+			}else{
+			setFailed(true)
+
+			}	
+		}else{
+			if (history[history?.length-1]?.role == "ai" || history?.length == 0 ){
+				setFailed(false)
+			}
+		}
+	},[active, history])
+
 
 	async function getModels(){
 		const data = await fetch("/api/chat/models")
@@ -36,8 +63,8 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 				})
 			}else{
 				setModel({
-					"id":response.models[i].id,
-					"name":response.models[i].name
+					"id":response.models[0].id,
+					"name":response.models[0].name
 				})
 			}
 		}
@@ -74,6 +101,7 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 				const response = JSON.parse((await data.json()).chat)
 				console.log(response)
 				const new_history = construct(response).map(m => ({ ...m, instant: true }))
+				setFailed(false)
 				prevHistoryLen.current = 0
 				updateHistory(new_history)
 			}
@@ -122,7 +150,7 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 		function onObject(content) {
 			console.log(content)
 			if(content.chat_id){
-				console.log("chat_id received")
+				console.log("response finish received")
 				setChatID(content.chat_id)
 				setActive(false)
 			}else if (content.content){
@@ -214,9 +242,12 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 		if (!response.ok){
 			setActive(false)
 			// Nuke AI's resposne
-			const old_his = [...history]
-			old_his.pop()
-			updateHistory(old_his)
+			updateHistory(h=>{
+				const old_his = [...h]
+				old_his.pop()
+				return old_his
+			})
+			setFailed(true)
 		}
 
 
@@ -299,26 +330,38 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 	
 	async function sendMessage(message,files){
 		// File preprocessing 
-		const parsed_files = await Promise.all(files.map(async e => {
-			if (e.type.includes("text/")){
-				return { name: e.name, body: await e.text() }
-			} else if (e.type.includes("image/")){
-				const dataUrl = await new Promise((resolve, reject) => {
-					const reader = new FileReader();
-					reader.onload = () => resolve(reader.result);
-					reader.onerror = reject;
-					reader.readAsDataURL(e);
-				});
-				return { name: e.name, body: dataUrl }
+		console.log("FILES UNHEER")
+		console.log(files)
+		const parsed_files = await Promise.all((files||[]).filter(Boolean).map(async e => {
+			const mime = e.type || "";
+			try {
+				if (mime.includes("image/")){
+					const dataUrl = await new Promise((resolve, reject) => {
+						const reader = new FileReader();
+						reader.onload = () => resolve(reader.result);
+						reader.onerror = () => reject(reader.error);
+						reader.readAsDataURL(e);
+					});
+					return { name: e.name, type: mime, body: dataUrl }
+				}
+				// Default: try to read as text (covers text/*, empty type, json, etc.)
+				// Binary types (pdf/docx/zip/...) will still resolve, backend marks unsupported if needed
+				return { name: e.name, type: mime, body: await e.text() }
+			} catch(err) {
+				console.error("file read failed:", e?.name, err);
+				return { name: e?.name ?? "unknown", type: mime, body: "", error: String(err?.message ?? err) };
 			}
 		}));
 
+		console.log("FILES HEEER:")
+		console.log(parsed_files)
 
 		const oldH = [...history]
 		// add user message
 		oldH.push({
 			role:"user",
-			content:message
+			content:message,
+			files:parsed_files.map((e)=>{return {name:e.name}})
 		})
 		// add AI message
 		oldH.push({
@@ -333,7 +376,7 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 		const response = await fetch(`/api/chat/send`,{
 			method:"POST",
 			headers:{"Content-Type":"application/json"},
-			body:JSON.stringify({content:message,chat_id:chat_id?.toString(),model:model.id}),
+			body:JSON.stringify({content:message,chat_id:chat_id?.toString(),model:model.id, files:parsed_files}),
 			credentials:"include"
 		})
 		if (!response.ok){
@@ -367,10 +410,10 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 			<div ref={chat} className={`w-full ${expanded || history.length>0 ? "sm:h-full" : "sm:h-1/2"} h-full overflow-y-scroll flex flex-col items-center transition-all duration-500 `}>
 				<div className={`min-w-9/16 w-204 max-w-full   py-12   flex flex-col`}>
 					{history.map((e,i)=>(
-						<Message key={i} message={e}></Message>
+						<Message key={i} message={e} files={e?.files || []}></Message>
 					))}
 					{/* last message = user && generating = false  */}
-					{!active && history[history?.length-1]?.role == "user" && <Failed regen={resendMessage}/>}
+					{failed && <Failed regen={resendMessage}/>}
 					<div className="h-6 sm:h-24 w-full  shrink-0"></div>
 		
 			

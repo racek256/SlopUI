@@ -9,6 +9,7 @@ import sqlite3
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 load_dotenv('../.env')
+from stuff.settings import get_settings
 
 from stuff.logging_setup import setup_logging
 setup_logging()
@@ -28,9 +29,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from stuff.MCP.mcp_manager import SessionManager
 
-MCP_CONFIGS = {
-    "lightpanda":  {"command": "/home/racek/.local/bin/lightpanda", "args": ["mcp"]},
-}
+#MCP_CONFIGS = {
+#    "lightpanda":  {"command": "/home/racek/.local/bin/lightpanda", "args": ["mcp"]},
+#}
+MCP_CONFIGS = {item["name"]: item for item in get_settings()["MCPS"]}
+
+
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -93,7 +98,7 @@ def initDB():
 def setupDemo(conn):
     cursor = conn.cursor()
     demoacc = cursor.execute("select * from users where username = 'demo'").fetchone()
-    if (os.environ.get("DEMO_MODE") == "true"): 
+    if (get_settings()["app"]["demo_mode"] == "true"): 
         if demoacc is None:
             bytes = "demo".encode('utf-8')
             salt = bcrypt.gensalt()

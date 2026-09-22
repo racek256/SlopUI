@@ -1,3 +1,4 @@
+from stuff.settings import get_settings
 import rs_trafilatura
 import logging
 import time
@@ -8,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from litellm import embedding, rerank
 from sentence_transformers import CrossEncoder
 import re
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +58,6 @@ def _is_token_limit_error(e: Exception) -> bool:
 
 
 def _embed_batches(model: str, batches):
-    """Embed batches, recursively halving any batch the provider rejects
-    for exceeding its token limit. Returns flat list of data items."""
     from litellm.exceptions import BadRequestError
 
     data = []
@@ -93,7 +93,6 @@ def _embed_batches(model: str, batches):
 
 
 def chunk_text(text, max_chars=2000, overlap=200):
-    """Pure-Python overlapping chunker — no native tokenizer."""
     text = text.strip()
     if not text:
         return []
@@ -155,7 +154,7 @@ def pages(urls):
 
     if not urls:
         return []
-    with httpx.Client(timeout=10.0, headers=headers, follow_redirects=False) as client:
+    with httpx.Client(timeout=5, headers=headers, follow_redirects=False) as client:
         with ThreadPoolExecutor(max_workers=min(len(urls), 20)) as pool:
             futures = [pool.submit(fetch_page, client, u) for u in urls]
             results = [f.result() for f in futures]
@@ -164,10 +163,12 @@ def pages(urls):
 
 def embeddings(query, results, starttime):
     logger.debug("starting embedding")
+    query = (query or "").strip() or "search"
     content = []
     for result in results:
-        for chunk in chunk_text(result["content"]):   
-            content.append({"url": result["url"], "content": chunk, "title":result["title"]})
+        for chunk in chunk_text(result.get("content") or ""):
+            if chunk and chunk.strip():
+                content.append({"url": result["url"], "content": chunk, "title": result["title"]})
 
     if not content:
         return []
@@ -175,7 +176,7 @@ def embeddings(query, results, starttime):
     inputs = [_truncate(query, MAX_QUERY_CHARS)] + [
         _truncate(c["content"], MAX_EMBED_CHARS) for c in content
     ]
-    data = _embed_batches(os.environ["EMBEDDING_MODEL"], batch_embed_inputs(inputs))
+    data = _embed_batches(get_settings()["embedding"]["model"], batch_embed_inputs(inputs))
     e_query = data[0]
     content_embeds = data[1:]
 
@@ -190,7 +191,7 @@ def embeddings(query, results, starttime):
 
     logger.debug(f"finished embedding in {time.perf_counter()-starttime}, starting reranking")
 
-    if os.environ["RERANKER_RUNNER"] == "local":
+    if get_settings()["reranker"]["runner"] == "local":
         # Reranker magic
         model = CrossEncoder("cross-encoder/ettin-reranker-68m-v1")
 
@@ -245,23 +246,37 @@ def embeddings(query, results, starttime):
 
     return response
 
-def websearch(query):
-    start = time.perf_counter() 
-    with httpx.Client(timeout=10) as client:
-        response = client.get(
-            f"http://127.0.0.1:8888/search?q={query}&format=json&safesearch=0"
-        )
-    data = response.json()
-
-    urls = [r["url"] for r in data.get("results", [])][:15]
-    if not urls:
+async def betterSearch(queries):
+    """Search but better frfr ngl"""
+    if not queries:
         return []
+    array = [asyncio.to_thread(websearch, q) for q in queries]
+    result = await asyncio.gather(*array)
+    return result
+    return result
 
-    logger.debug(f"search query finished in {time.perf_counter()-start}")
-    pages_result = pages(urls)
-    logger.debug(f"all pages fetched in {time.perf_counter()-start}")
+def websearch(query):
+    try:
+        start = time.perf_counter() 
+        with httpx.Client(timeout=10) as client:
+            response = client.get(
+                f"http://127.0.0.1:8888/search?q={query}&format=json&safesearch=0"
+            )
+        data = response.json()
 
-    return embeddings(query, pages_result, start)
+        urls = [r["url"] for r in data.get("results", [])][:15]
+        if not urls:
+            return []
+
+        logger.debug(f"search query finished in {time.perf_counter()-start}")
+        pages_result = pages(urls)
+        logger.debug(f"all pages fetched in {time.perf_counter()-start}")
+
+        return embeddings(query, pages_result, start)
+    except Exception as e:
+        logger.debug("websearch failed with error:")
+        logger.debug(e)
+        return({"error":"websearch has failed try again later"})
 
 def top_k_similar(query, results, k=None):
     q = query / np.linalg.norm(query)
@@ -280,7 +295,7 @@ def rerank_openrouter(
     top_n: int | None = None,
     model: str | None = None,
 ) -> list[dict]:
-    model = model or os.environ["RERANKER_MODEL"]
+    model = model or get_settings()["reranker"]["model"] 
     payload: dict[str, object] = {
         "model": model,
         "query": query,

@@ -1,3 +1,5 @@
+from stuff.files import file_processor
+import json
 class Error(Exception):
     def __init__(self, error_msg: str, error_type: str) -> None:
         self.error_message = error_msg
@@ -15,14 +17,22 @@ def CreateChat(conn, user_id, chatName=None):
     conn.commit()
     return chat_id
 
-def InsertMessage(conn, user_id, chat_id, role, content, chain=None):
+def InsertMessage(conn, user_id, chat_id, role, content, chain=None, files=None):
     cursor = conn.cursor()
     chat = cursor.execute("select user_id, current_message_id from chats where id = ?",(chat_id,)).fetchone()
     if not chat: 
         raise Error("chat doesn't exist", "not_found")
     if not chat["user_id"] == user_id:
         raise Error("user is not owner of this chat", "permission")
-    cursor.execute("insert into messages (chat_id, content, role, parent_message_id, chain) values (?,?,?,?,?)",(chat_id, content,role, chat["current_message_id"] or None, chain))
+    # File preparation
+    json_files = None
+    if files:
+        json_files = file_processor(files)
+    cursor.execute("insert into messages (chat_id, content, role, parent_message_id, chain, files) values (?,?,?,?,?,?)",(chat_id, content,role, chat["current_message_id"] or None, chain, json_files))
+
+       
+
+
     message_id = cursor.lastrowid
     # Set to current message
     cursor.execute("update chats set current_message_id = ? where id = ?", (message_id, chat_id))
@@ -60,6 +70,7 @@ def GetChat(conn, user_id, chat_id):
                 "id":message["id"],
                 "content":message["content"],
                 "role":message["role"],
+                "files": json.loads(message["files"]) if message["files"] is not None else [],
                 "parent_message_id": message["parent_message_id"]
                 })
         else:

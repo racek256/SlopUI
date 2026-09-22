@@ -23,7 +23,7 @@ export default function Login({finishLogin}){
 				<div className="bg-[#00288e] h-full w-4"/>
 				<div className={`flex justify-center items-center shadow grow h-full rounded-r-lg select-none cursor-pointer ${signup && "bg-[#e1e1e1]"} `} onClick={()=>{switchsignup(true)}}>Sign up</div>
 			</div>
-			{demo & signup ? <p className="p-6 text-xl">Signup is disabled in demo mode</p>: <div className="flex flex-col w-full">
+			{demo && signup ? <p className="p-6 text-xl">Signup is disabled in demo mode</p>: <div className="flex flex-col w-full">
 				<input ref={username} className="border-[#c1c1c1] border rounded-lg p-2 w-full h-12 mt-4" placeholder='enter username'/>
 				<input ref={password} className="border-[#c1c1c1] border rounded-lg p-2 w-full h-12 mt-2" placeholder='enter password' type="password"/>
 		{error && <p className="self-start py-1 text-red-500 text-bold">{error}</p>}

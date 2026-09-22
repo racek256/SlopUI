@@ -6,7 +6,6 @@ import { useRef } from 'react'
 
 export default function Reasoning({ message }) {
 	const [hovered, setHovered] = useState(false)
-	console.log(message)
 
 	return <div className="flex flex-col reason-selector" onMouseOver={()=>{
 			setHovered(true)
@@ -82,8 +81,7 @@ export default function Reasoning({ message }) {
 							key="webfetch"
 							className="  bg-[#b8c4ff] w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
 							<Webfetch fill="black" className="shrink-0 animate-pulse size-8 block" /> Webfetch</motion.div>)
-				} 
-				} else if(!message.content) {
+				}else if (reason?.type.includes("lightpanda")){
 					return (
 						<motion.div
 							initial={{
@@ -99,14 +97,54 @@ export default function Reasoning({ message }) {
 								opacity: 0
 							}}
 							transition={{ duration: 0.5 }}
-							key="waking"
-
+							key="lightpanda"
 							className="  bg-[#b8c4ff] w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
-							<div className="w-6 h-6 m-1 animate-spin transition-all bg-black loading" /> Waking up</motion.div>
+							<Webfetch fill="black" className="shrink-0 animate-pulse size-8 block" />Browsing</motion.div>)
+				}else{
+					return(
+						<motion.div
+								initial={{
+									y: 10,
+									opacity: 0
+								}}
+								animate={{
+									y: 0,
+									opacity: 1
+								}}
+								exit={{
+									y: -10,
+									opacity: 0
+								}}
+								transition={{ duration: 0.5 }}
+								key="something"
+								className="  bg-[#b8c4ff] w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
+						{reason?.type}</motion.div>)
 
-					)
+
 				}
-				
+ 
+				}else if(!message.content){
+					return(
+						<motion.div
+							initial={{
+								y: 10,
+								opacity: 0
+							}}
+							animate={{
+								y: 0,
+								opacity: 1
+							}}
+							exit={{
+								y: -10,
+								opacity: 0
+							}}
+							transition={{ duration: 0.5 }}
+							key="waking"
+							className="  bg-[#b8c4ff] w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
+							<div className="w-6 h-6 m-1 animate-spin transition-all bg-black loading" /> Waking up</motion.div>)
+						
+				}
+
 
 			})()}
 		</AnimatePresence>
@@ -160,8 +198,8 @@ function ReasonHover(message){
 			}else{
 				return(
 					<div className='flex items-center'>
-						<div className='p-1 font-bold text-md'>websearch</div>
-						<p className='mx-2'>{Math.round((stoptime - e.startTime)*10/1000)/10}s</p>
+						<div className='p-1 font-bold text-md'>{e?.type}</div>
+					{(e.type != "response" || message.message.reason_chain[i+1]) && <p className='mx-2'>{Math.round((stoptime - e.startTime)*10/1000)/10}s</p>}
 					</div>
 				)
 			}

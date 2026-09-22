@@ -1,10 +1,9 @@
+from stuff.settings import get_settings
 import logging
-import os
-
 
 def setup_logging():
     logging.basicConfig(
-        level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+        level=get_settings().get("LOG_LEVEL", "INFO").upper(),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     logging.getLogger("LiteLLM").setLevel(logging.WARNING)

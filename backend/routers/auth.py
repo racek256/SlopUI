@@ -22,7 +22,8 @@ async def authenticate(request: Request):
             return(VerifyToken(token))
         else:
             return(None)
-    except Exception:
+    except Exception as e:
+        logger.exception(e)
         return(None)
 
 router = APIRouter(prefix="/auth",tags=["auth"])

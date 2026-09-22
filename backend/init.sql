@@ -19,5 +19,6 @@ CREATE TABLE IF NOT EXISTS messages (
 	chain TEXT,
 	role TEXT NOT NULL,
 	parent_message_id INTEGER,
+	files TEXT,
 	FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
 );

@@ -1,0 +1,33 @@
+app:
+  demo_mode: false # allows creating temp accounts
+  log_level: info
+  search_provider: remote # local|remote
+search: 
+  provider: remote # local/remote
+  tavily: true/false # if remote
+  exa: true/false # if remote
+embedding: # only used when search provider is local
+  runner: remote
+  model: "openrouter/perplexity/pplx-embed-v1-0.6b"
+  search_limit: 20
+reranker: # only used when search provider is local
+  runner: openrouter # currently openrouter is only supported provider 
+  model: "cohere/rerank-4-fast"
+  chunks_limit: 35 # amount of chunks that can enter reranker (sorted)
+models:
+  - provider: openrouter
+    format: builtin
+    api_key_env: OPENROUTER_API_KEY # <-- only reference, value stays in .env
+    models: [{id: "openrouter/qwen/qwen3.7-flash", name: "Qwen 3.7 flash"}]
+  - provider: openai-provider
+    baseURL: https://example.com/v1
+    format: openai
+    api_key_env: PROVIDER_API_KEY
+    models: [{id: "provider/really-good-model", name: "really good model"}]
+MCPS:
+  - name: your-favorite-mcp
+    command: "/path/to/your/mcp"
+    args:
+      - any 
+	  - argument
+ 

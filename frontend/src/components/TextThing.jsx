@@ -32,6 +32,7 @@ export default function TextThing({sendMessage, active, interrupt, expanded, mod
 				if(message !=""){
 					sendMessage(message, files)
 					text.current.value = ""
+					setFiles([])
 				}
 			}else{
 				if(button){

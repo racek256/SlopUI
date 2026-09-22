@@ -6,20 +6,21 @@ from DB.connection import get_conn
 import json
 from stuff.harness import harness, title
 import sqlite3
+from stuff.files import text_files_injector, image_request_builder
 
 logger = logging.getLogger(__name__)
 
-async def run_generation(gen, conn,user_id, chat_id, content, model, mcp):
+async def run_generation(gen, conn,user_id, chat_id, content, model, mcp, files):
     conn = sqlite3.connect("db.db", check_same_thread=False)
     conn.row_factory = sqlite3.Row
-    async for item in chat(conn, user_id, chat_id, content, model, mcp):
+    async for item in chat(conn, user_id, chat_id, content, model, mcp, files):
         publish(gen, item)
     publish(gen, DONE)
                 
                 
 
 
-async def chat(conn,user_id, chat_id, content, model, mcp):
+async def chat(conn,user_id, chat_id, content, model, mcp, files):
     cursor = conn.cursor()
 
 
@@ -39,14 +40,14 @@ async def chat(conn,user_id, chat_id, content, model, mcp):
     try:
         cursor.execute("update users set last_model = ? where id = ?", (model, user_id))
         cursor.execute("update chats set last_model = ? where user_id = ? and id = ?", (model, user_id, chat_id))
-    except:
-        logger.warning("updating last model failed")
+    except Exception as e:
+        logger.exception("updating last model failed")
 
 
     last_message = None
     if content != "[REGEN_USER_MESSAGE]":
         # Insert user message
-        last_message = InsertMessage(conn, user_id, chat_id, "user", content)
+        last_message = InsertMessage(conn, user_id, chat_id, "user", content, None, files)
     else:
         query = cursor.execute("select id from messages where chat_id = ? order by id desc limit 1", (chat_id,)).fetchone()
         last_message = query["id"]
@@ -68,9 +69,16 @@ async def chat(conn,user_id, chat_id, content, model, mcp):
                     chain.reverse()
                     history += chain
                 else:
+                    user_content = message["content"]
+                    files = json.loads(message["files"]) if message["files"] else []
+
+                    if files:
+                        print(files)
+                        user_content += text_files_injector(files)
+
                     history.append({
                         "role":"user",
-                        "content":message["content"]
+                        "content":[{"type":"text", "text":user_content}] + image_request_builder(files)
                         })
                 if message["parent_message_id"] is not None:
                     last_message = message["parent_message_id"]
@@ -92,14 +100,13 @@ async def chat(conn,user_id, chat_id, content, model, mcp):
     
     
     # start harness
-    #g = harness(history,None,model, session)
     response = None
 
 
     ### TODO: Forward streaming to router
 
 
-    async for item in harness(history, None, model, session):
+    async for item in harness(history, model, session, chat_id):
         if type(item) != str:
             response = item
             last_message = InsertMessage(conn, user_id, chat_id, "assistant", response["content"], json.dumps(response["chain"]))

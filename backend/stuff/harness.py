@@ -1,3 +1,4 @@
+from stuff.settings import get_settings
 from stuff.tools.webfetch import webfetch
 from dataclasses import asdict
 import logging
@@ -7,11 +8,12 @@ from litellm import acompletion, completion, stream_chunk_builder
 from tavily import TavilyClient
 import json
 import os 
-from stuff.tools.websearch import websearch 
+from stuff.tools.websearch import websearch, betterSearch
 from litellm.llms.openai_like.json_loader import JSONProviderRegistry, SimpleProviderConfig
 from litellm import experimental_mcp_client
 from litellm.exceptions import Timeout
 from exa_py import Exa
+
 import litellm; litellm.drop_params=True
 litellm.suppress_debug_info = True
 
@@ -22,19 +24,17 @@ logger = logging.getLogger(__name__)
 
 # load dinamically from config.json
 JSONProviderRegistry.load()  # ensure existing ones are loaded first
-with open('config.json','r') as f:
-    data = json.load(f)
-    providers = data["allowed_models"]
-    for provider in providers:
-        if provider["format"] == "openai":
-            logger.info(f"Loading provider {provider['provider']}")
-            JSONProviderRegistry._providers[provider["provider"]] = SimpleProviderConfig(
-                provider["provider"],
-                {
-                    "base_url": provider["baseURL"],
-                    "api_key_env": provider["api_key_env"],
-                },
-            )
+providers = get_settings()["models"]
+for provider in providers:
+    if provider["format"] == "openai":
+        logger.info(f"Loading provider {provider['provider']}")
+        JSONProviderRegistry._providers[provider["provider"]] = SimpleProviderConfig(
+            provider["provider"],
+            {
+                "base_url": provider["baseURL"],
+                "api_key_env": provider["api_key_env"],
+            },
+        )
 # TODO: Figure some better placement for this JSON blob
 tools = [
     {
@@ -45,9 +45,9 @@ tools = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {"type": "string", "description": "your search query"}
+                    "queries": {"type": "array", "items": {"type": "string"}, "description": "array of your search queries"}
                 },
-                "required": ["query"]
+                "required": ["queries"]
             }
         }
     },
@@ -101,6 +101,15 @@ You are Slopper,  You are NOT an assistant. You are NOT helpful for the sake of 
 6. no need to overexplain or overtalk anything unless user asks you something or wants in depth explanation 
 7. keep your messages short and structured unless needed otherwise
 
+**Informations**
+- You always try to provide user proof of your response by sharing sources
+- You don't share sources at end of message as sources instead you Naturaly embed them inside your response as clickable markdown links
+- If they don't really fit naturaly inside response but you still used them as context you still need to mention them at end of your message
+- Never give user urls you haven't checked/search or otherwise verified they are real and working - Giving user broken URL is the worst thing that can happen to user
+
+**usefullness**
+- you don't need to be usefull but when you decide to help go ALL/IN verify everything and even more go beyond users request 
+
 **PERSONALITY:**
 - Enthusiastic but grounded, dry sarcastic humor
 
@@ -140,7 +149,7 @@ you call tools yourself, as many as you need, across multiple rounds in a single
 
     
 
-async def harness(history,request, model, session):
+async def harness(history, model, session, chat_id=None):
     # main harness loop
     chain = []
     active = True
@@ -149,13 +158,17 @@ async def harness(history,request, model, session):
     # include MCP tools
     logger.debug("MCP tools: %s", [t["function"]["name"] for t in session.all_tools()])
     session_tools = tools + session.all_tools()
+    if model.startswith("opencode-go/"):
+        go_headers = {"x-opencode-session": str(chat_id or "default"), "User-Agent": "SlopUI/1.0"}
+    else:
+        go_headers = {}
     while active:
-        messages = [{"role":"system", "content":system_prompt}] + history + ([{"role":"user","content":request}] if request else []) + chain
+        messages = [{"role":"system", "content":system_prompt}] + history + chain
         for msg in messages:
             if msg.get("role") == "assistant" and "reasoning_content" not in msg:
                 msg["reasoning_content"] = ""
         logger.debug("harness round starting (model=%s, messages=%d)", model, len(messages))
-        response = await acompletion(model, messages, tools=session_tools, stream=True, num_retries=3)
+        response = await acompletion(model, messages, tools=session_tools, stream=True, num_retries=3, extra_headers=go_headers)
         chunks = []
 
         #
@@ -188,10 +201,10 @@ async def harness(history,request, model, session):
                     match tool.function.name:
                         case "websearch":
                             data = None
-                            if os.environ["SEARCH_PROVIDER"] == "local":
-                                data = websearch(args["query"])
+                            if get_settings()["search"]["provider"] == "local":
+                                data = await betterSearch(args["queries"])
                             else:
-                                data = remotewebsearch(args["query"])
+                                data = remotewebsearch(args["queries"][0])
                             logger.debug("tool result: %.500s", str(data))
                         case "webfetch":
                             data = webfetch(**args)

@@ -177,3 +177,5 @@ ENV/
 *.sqlite
 *.sqlite3
 *.db
+*.config.yml
+*.config.yaml

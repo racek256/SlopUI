@@ -2,9 +2,37 @@
   <defs>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@800&amp;display=swap');
+
+      .slop-logo-pill {
+        fill: #FCF9F8;
+      }
+
+      .slop-logo-brand {
+        fill: #00288E;
+      }
+
+      .slop-logo-ui {
+        fill: #1C1B1B;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .slop-logo-pill {
+          fill: #2B2B2F;
+          stroke: rgba(255, 255, 255, 0.09);
+          stroke-width: 1;
+        }
+
+        .slop-logo-brand {
+          fill: #B8C4FF;
+        }
+
+        .slop-logo-ui {
+          fill: #EDEAE6;
+        }
+      }
     </style>
   </defs>
-  <rect x="0" y="0" width="244" height="56" rx="8" fill="#FCF9F8"/>
-  <text x="63.68" y="38" font-family="Manrope, sans-serif" font-weight="800" font-size="36" fill="#00288E">Slop</text>
-  <text x="143.53" y="38" font-family="Manrope, sans-serif" font-weight="800" font-size="36" fill="#1C1B1B">UI</text>
+  <rect class="slop-logo-pill" x="0" y="0" width="244" height="56" rx="8" />
+  <text class="slop-logo-brand" x="63.68" y="41.13" font-family="Manrope, sans-serif" font-weight="800" font-size="36">Slop</text>
+  <text class="slop-logo-ui" x="143.53" y="41.13" font-family="Manrope, sans-serif" font-weight="800" font-size="36">UI</text>
 </svg>

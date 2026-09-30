@@ -7,16 +7,18 @@ export default function Background({expanded}){
 	}
 
 	const divRef = useRef()
-	useEffect(()=>{
-		const observer = new ResizeObserver((entries)=>{
-			if(Math.round(entries[0].contentRect.width/56) > 0){
-				setNumber(Math.round(entries[0].contentRect.width/56))
-			}
 
-		})
-		observer.observe(divRef.current)
-
-	},[])
+	useEffect(() => {
+	  let t
+	  const observer = new ResizeObserver(([entry]) => {
+		const n = Math.round(entry.contentBoxSize[0].inlineSize / 60)
+		if (n <= 0) return
+		clearTimeout(t)
+		t = setTimeout(() => setNumber(n), 120) // or setNumber(prev => n !== prev ? n : prev)
+	  })
+	  observer.observe(divRef.current)
+	  return () => { clearTimeout(t); observer.disconnect() }
+	}, [])
 
 
 	return(

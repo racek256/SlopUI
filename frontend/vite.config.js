@@ -10,6 +10,8 @@ export default defineConfig(({ mode }) => {
     envDir: '..',
     define: {
 	  'import.meta.env.VITE_DEMO_MODE': JSON.stringify(env.DEMO_MODE === 'true'),
+	  'import.meta.env.DISCORD_CLIENT_ID': JSON.stringify(env.DISCORD_CLIENT_ID),
+	  'import.meta.env.DISCORD_REDIRECT_URI': JSON.stringify(env.DISCORD_REDIRECT_URI),
     },
     plugins: [react(), tailwindcss(), svgr()],
     server: {

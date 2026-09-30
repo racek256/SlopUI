@@ -1,7 +1,8 @@
 CREATE TABLE IF NOT EXISTS users (
 	id INTEGER PRIMARY KEY,
+	discord_id INTEGER,
 	username TEXT NOT NULL UNIQUE,
-	password_hash TEXT NOT NULL,
+	password_hash TEXT,
 	last_model TEXT
 );
 CREATE TABLE IF NOT EXISTS chats (

@@ -31,7 +31,7 @@ def CreateUser(conn, username, password):
         conn.commit()
         return encoded
     except Exception as e:
-        raise Error(e, "system error")
+        raise Error(str(e), "system error")
 
 def LoginUser(conn, username, password):
     bytes = password.encode('utf-8')
@@ -43,12 +43,15 @@ def LoginUser(conn, username, password):
     hash = row["password_hash"]
     if not bcrypt.checkpw(bytes,hash):
         raise Error("Incorrect password", "auth_failure")
-    encoded = jwt.encode({"username": username, "user_id":row["id"]}, os.environ["SECRET"], algorithm="HS256")
+    encoded = genToken(username, row["user_id"])
     return encoded
 
 def VerifyToken(token):
     decoded = jwt.decode(token, os.environ["SECRET"], algorithms="HS256")
     return decoded["user_id"]
+
+def genToken(username, user_id):
+        return jwt.encode({"username": username, "user_id":user_id}, os.environ["SECRET"], algorithm="HS256")
 
 
     

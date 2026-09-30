@@ -58,6 +58,25 @@ function App() {
 			}
 		}
 		if(!token){
+			requestAuth()
+
+			async function requestAuth(){
+				const url = new URL(window.location.href)
+				if (url.searchParams.get("code")){
+					let code = url.searchParams.get("code")
+					console.log(code)
+					// Ask backend nicely for authentication
+					const response = await fetch("/api/auth/discord",{
+						method:"POST",
+						headers:{"Content-Type":"application/json"},
+						body:JSON.stringify({code:code})
+					})
+					if (response.ok){
+						location.reload()
+					}
+				}
+			}
+
 			toggleLoginWindow(true)
 		}else{
 			verifyToken(token)
@@ -66,16 +85,17 @@ function App() {
 
 
   return (
-		<div className='flex h-dvh sm:p-0 '>
+		<div className='flex h-dvh sm:p-0 dark:bg-background'>
 		  <Sidebar search={()=>{setSearch(true)}} chats={chats} loadChat={(i)=>setChatId(i)} newChat={()=>{setChatId(null)}}/>
-		  <section className='flex  justify-center  w-full min-w-0'>
+		  <section className='flex relative justify-center  w-full min-w-0'>
 	  		{loginWindow && <Login finishLogin={()=>{location.reload()}}/>}
 			<Background expanded={expanded}/>
 			  <Chat expanded={expanded} setExpanded={setExpanded} chat_id={chat_id} setChatID={setChatId}/> 
+	  					<AnimatePresence>	  
+						  {search && <SearchChat chats={chats} loadChat={(i)=>setChatId(i)} remove={()=>{setSearch(false)}}/>}
+						</AnimatePresence>;
 			</section>
-			<AnimatePresence>	  
-	  		  {search && <SearchChat remove={()=>{setSearch(false)}}/>}
-	        </AnimatePresence>
+
 		</div>
   )
 }

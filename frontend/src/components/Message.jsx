@@ -13,7 +13,7 @@ export default function Message({ message,files }) {
 	if (message.role === "user") {
 		return (
 			<motion.div
-				className="border-[#b8c4ff] border bg-white w-max max-w-2/3 min-w-0 self-end my-2 text-sm sm:text-base rounded-2xl "
+				className="border-accent border bg-secondary text-text w-max max-w-2/3 min-w-0 self-end my-2 text-sm sm:text-base rounded-2xl "
 				initial={!message.instant && { opacity: 0, y: 10 }}
 				animate={{ opacity: 1, y: 0 }}
 			>
@@ -47,7 +47,7 @@ export default function Message({ message,files }) {
 	} else {
 		return (
 			<div className="min-w-full">
-				<motion.div className="border-[#b8c4ff] border bg-white  h-max w-max text-sm sm:text-base rounded-2xl p-4 px-5 self-start max-w-full   my-2 transition-all "
+				<motion.div className=" border-accent border text-text bg-secondary dark:text-white  h-max w-max text-sm sm:text-base rounded-2xl p-4 px-5 self-start max-w-full   my-2 transition-all "
 					initial={!message.instant && {
 						opacity: 0,
 						y: 10
@@ -65,7 +65,7 @@ export default function Message({ message,files }) {
 						<div>
 							{/*<div className={`w-8 h-8   animate-spin  ${message.content != "" ? "-ml-12" : ""} m-1 transition-all bg-black loading text-base whitespace-pre-wrap`}/>*/}
 						</div>
-						<div className=" w-full inline p-0">
+						<div className=" w-full inline p-0 text-content-text dark:prose-invert">
 							<ReactMarkdown remarkPlugins={[remarkGfm]}>
 								{message.content}
 							</ReactMarkdown >

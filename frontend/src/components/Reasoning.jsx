@@ -39,7 +39,7 @@ export default function Reasoning({ message }) {
 								}}
 								transition={{ duration: 0.5 }}
 								key="reason"
-								className=" bg-[#b8c4ff] w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
+								className=" bg-reason w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
 								<div className="w-6 h-6 m-1 animate-spin transition-all bg-black loading" /> Reasoning</motion.div>
 
 						)
@@ -60,7 +60,7 @@ export default function Reasoning({ message }) {
 								}}
 								transition={{ duration: 0.5 }}
 								key="websearch"
-								className="  bg-[#b8c4ff] w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
+								className="  bg-reason w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
 								<Search fill="black" className="shrink-0 animate-pulse size-8 block" /> Websearch</motion.div>)
 					} else if (reason?.type == "webfetch") {
 					return (
@@ -79,7 +79,7 @@ export default function Reasoning({ message }) {
 							}}
 							transition={{ duration: 0.5 }}
 							key="webfetch"
-							className="  bg-[#b8c4ff] w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
+							className="  bg-reason w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
 							<Webfetch fill="black" className="shrink-0 animate-pulse size-8 block" /> Webfetch</motion.div>)
 				}else if (reason?.type.includes("lightpanda")){
 					return (
@@ -98,7 +98,7 @@ export default function Reasoning({ message }) {
 							}}
 							transition={{ duration: 0.5 }}
 							key="lightpanda"
-							className="  bg-[#b8c4ff] w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
+							className="  bg-reason w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
 							<Webfetch fill="black" className="shrink-0 animate-pulse size-8 block" />Browsing</motion.div>)
 				}else{
 					return(
@@ -117,7 +117,7 @@ export default function Reasoning({ message }) {
 								}}
 								transition={{ duration: 0.5 }}
 								key="something"
-								className="  bg-[#b8c4ff] w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
+								className="  bg-reasong w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
 						{reason?.type}</motion.div>)
 
 
@@ -140,7 +140,7 @@ export default function Reasoning({ message }) {
 							}}
 							transition={{ duration: 0.5 }}
 							key="waking"
-							className="  bg-[#b8c4ff] w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
+							className="  bg-reason w-max h-max rounded-lg mb-2 text-center flex items-center justify-center  text-black text-xl px-2 py-1">
 							<div className="w-6 h-6 m-1 animate-spin transition-all bg-black loading" /> Waking up</motion.div>)
 						
 				}
@@ -171,7 +171,7 @@ function ReasonHover(message){
 
 
 	return(
-		<motion.div className='reason-box w-lg h-64 rounded-xl  z-200 border-[#b8c4ff] border bg-white  max-w-9/10          shadow-2xl  shadow-gray-300'
+		<motion.div className='reason-box w-lg h-64 rounded-xl  z-200 border-accent border text-text bg-secondary  max-w-9/10          shadow-2xl  shadow-accent/20'
 		initial={{
 					opacity: 0
 				}}

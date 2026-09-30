@@ -2,6 +2,13 @@ app:
   demo_mode: false # allows creating temp accounts
   log_level: debug
   search_provider: local # local|remote
+auth:
+  discord:
+    enabled: false
+  password:
+    enabled: false
+    login: true
+    signup: false
 search:
   provider: local # local/remote
   litellm: disabled # if remote

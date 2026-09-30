@@ -44,7 +44,7 @@ export default function TextThing({sendMessage, active, interrupt, expanded, mod
 	return (
 		<div className="relative bottom-0  w-204 min-w-9/16 max-w-full transition-all">
 		
-			<div className="bg-white  flex-col border border-[#b8c4ff] w-full  transition-all py-4 px-4 shadow-[#b8c4ff]/20 shadow flex z-1 rounded-2xl relative min-w-9/16  max-w-full -translate-y-4  [box-shadow:0_-6px_8px_-3px_rgba(0,0,0,0.2)]" 
+			<div className="bg-secondary flex-col border border-accent w-full  transition-all py-4 px-4 shadow-accent/20 shadow flex z-1 rounded-2xl relative min-w-9/16  max-w-full -translate-y-4  [box-shadow:0_-6px_8px_-3px_rgba(0,0,0,0.2)]" 
 			onDragOver={e => e.preventDefault()}	
 			onDrop={e=>{
 				addFile(e.dataTransfer.files[0])
@@ -74,11 +74,11 @@ export default function TextThing({sendMessage, active, interrupt, expanded, mod
 						e.preventDefault()
 						send()
 					}
-				}} className="bg-white w-full z-2  field-sizing-content max-h-64  resize-none text-2xl   " placeholder="Ask anything" />
+				}} className="w-full z-2 text-text  field-sizing-content max-h-64  resize-none text-2xl   " placeholder="Ask anything" />
 				<div className="flex justify-between items-center h-14 w-full overflow-hidden">
 					{/* Starting part */}
 					<div className="flex min-w-0 flex-1 items-center overflow-hidden">
-						<Add className="flex-none h-12 aspect-square hover:bg-[#b8c4ff] cursor-pointer rounded-xl" onClick={()=>{
+						<Add className="flex-none h-12 aspect-square hover:bg-hover cursor-pointer rounded-xl" onClick={()=>{
 							console.log("clicky click")
 							inputRef.current?.click()
 						}}/>

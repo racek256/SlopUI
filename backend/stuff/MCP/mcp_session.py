@@ -1,4 +1,5 @@
 import asyncio 
+import os
 from contextlib import AsyncExitStack
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -8,7 +9,10 @@ class MCPsession:
     def __init__(self, user_id: int, mcp_name: str, command: str, args):
         self.user_id = user_id
         self.mcp_name = mcp_name
-        self.server_params = StdioServerParameters(command=command,args=args)
+        # NOTE: the MCP SDK only inherits a safelist (HOME, PATH, ...) into
+        # subprocesses, so pass the full server environ (populated from .env
+        # via load_dotenv) through to every MCP server.
+        self.server_params = StdioServerParameters(command=command,args=args,env=dict(os.environ))
         self._stack = None
         self.session = None
         self.tools = None

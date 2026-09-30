@@ -9,6 +9,7 @@ numpy==2.5.2
 pydantic==2.13.4
 PyJWT==2.13.0
 python-dotenv==1.2.2
+rs_trafilatura==0.1.1  # on Python >= 3.14 build with: PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1 pip install rs_trafilatura
 sentence-transformers==5.7.0
 tavily-python==0.7.26
 trafilatura==2.2.0

@@ -1,3 +1,4 @@
+from stuff.settings import get_settings
 from auth.user import genToken
 from fastapi.responses import JSONResponse
 import httpx
@@ -33,9 +34,12 @@ async def authenticate(request: Request):
         return(None)
 
 router = APIRouter(prefix="/auth",tags=["auth"])
-
 @router.post("/register")
 def RegisterUser(data:UserData, conn = Depends(get_conn)):
+    auth = get_settings()["app"]["account_creation"]
+    if auth is False:
+        raise HTTPException(status_code=403, detail="account creation is disabled")
+
     try:
         result = CreateUser(conn, data.username, data.password)
         return JSONResponse(content={"success":True, "token":result}, status_code=201)
@@ -138,24 +142,31 @@ def discord(data:discord, conn=Depends(get_conn)):
             return response
         else:
             # create account
-            new_user = cursor.execute("insert into users (username, discord_id) values (?,?)", (user["username"], user["id"])).fetchone() 
-            user_id = cursor.lastrowid
-            jwt_token = genToken(user["username"], user_id)
-            try: 
-                conn.commit()
-                response = JSONResponse(content={"success": True}, status_code=200)
-                response.set_cookie(
-                    key="token",
-                    value=jwt_token,
-                    max_age=7 * 24 * 3600,   # 7 days, in seconds
-                    httponly=False,
-                    secure=False,             # False if testing over plain http://localhost
-                    samesite="lax",          # "none" if frontend/backend are truly cross-origin
-                )
-                return response
-            except Exception as e:
-                logger.error(e)
-                raise Error(str(e), "System error")
+            auth = get_settings()["app"]["account_creation"]
+
+            if auth == True:
+
+                new_user = cursor.execute("insert into users (username, discord_id) values (?,?)", (user["username"], user["id"])).fetchone() 
+                user_id = cursor.lastrowid
+                jwt_token = genToken(user["username"], user_id)
+                try: 
+                    conn.commit()
+                    response = JSONResponse(content={"success": True}, status_code=200)
+                    response.set_cookie(
+                        key="token",
+                        value=jwt_token,
+                        max_age=7 * 24 * 3600,   # 7 days, in seconds
+                        httponly=False,
+                        secure=False,             # False if testing over plain http://localhost
+                        samesite="lax",          # "none" if frontend/backend are truly cross-origin
+                    )
+                    return response
+                except Exception as e:
+                    logger.error(e)
+                    raise Error(str(e), "System error")
+            else: 
+                raise HTTPException(status_code=403, detail="Account creation is disabled")
+
 
 
 

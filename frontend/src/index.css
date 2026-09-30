@@ -46,7 +46,7 @@ html {
 
 body {
   scrollbar-width: thin;
-  scrollbar-color: rgba(0,0,0,.3) transparent;  /* thumb track */
+  scrollbar-color: rgba(0,0,0,.3) transparent;  
   margin: 0;
   background-color: #fcf9f8; 
   overflow: hidden;

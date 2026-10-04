@@ -13,9 +13,19 @@ logger = logging.getLogger(__name__)
 async def run_generation(gen, conn,user_id, chat_id, content, model, mcp, files):
     conn = sqlite3.connect("db.db", check_same_thread=False)
     conn.row_factory = sqlite3.Row
-    async for item in chat(conn, user_id, chat_id, content, model, mcp, files):
-        publish(gen, item)
-    publish(gen, DONE)
+    try:
+        async for item in chat(conn, user_id, chat_id, content, model, mcp, files):
+            publish(gen, item)
+        gen.status = "done"
+        publish(gen, DONE)
+    except Exception as e:
+        logger.exception("generation failed (chat_id=%s, model=%s)", chat_id, model)
+        gen.status = "error"
+        try:
+            publish(gen, json.dumps({"error": str(e), "type": type(e).__name__}) + "\n")
+        except Exception:
+            logger.exception("failed to publish error event")
+        publish(gen, DONE)
                 
                 
 

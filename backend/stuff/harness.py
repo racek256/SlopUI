@@ -24,17 +24,49 @@ logger = logging.getLogger(__name__)
 
 # load dinamically from config.json
 JSONProviderRegistry.load()  # ensure existing ones are loaded first
-providers = get_settings()["models"]
+providers = get_settings().get("models", [])
 for provider in providers:
-    if provider["format"] == "openai":
-        logger.info(f"Loading provider {provider['provider']}")
-        JSONProviderRegistry._providers[provider["provider"]] = SimpleProviderConfig(
-            provider["provider"],
+    try:
+        if provider.get("format") != "openai":
+            continue
+        name = provider.get("provider")
+        if not name:
+            logger.error("Skipping openai-format provider entry with no name: %s", provider)
+            continue
+        # Accept both `baseURL` (config.yaml) and `base_url` spellings.
+        base_url = provider.get("baseURL", provider.get("base_url"))
+        if not base_url:
+            logger.error("Skipping provider %s: missing baseURL/base_url", name)
+            continue
+        api_key_env = provider.get("api_key_env")
+        if api_key_env and api_key_env not in os.environ:
+            # Intentional no-auth mode: OpenAI-compatible servers (e.g. local
+            # Qwen) accept requests without Authorization. LiteLLM only sends
+            # the header when api_key is not None, and the OpenAI client
+            # rejects None, so inject an explicit dummy key instead.
+            os.environ[api_key_env] = "sk-no-auth"
+            logger.warning("Provider %s: env %s not set, using no-auth dummy key", name, api_key_env)
+        logger.info(f"Loading provider {name}")
+        JSONProviderRegistry._providers[name] = SimpleProviderConfig(
+            name,
             {
-                "base_url": provider["baseURL"],
-                "api_key_env": provider["api_key_env"],
+                "base_url": base_url,
+                "api_key_env": api_key_env,
             },
         )
+        # Unknown models default to supports_function_calling=False in litellm,
+        # which strips tools. Declare tool support for this provider's models.
+        try:
+            for m in provider.get("models", []):
+                mid = m.get("id") if isinstance(m, dict) else m
+                if not mid:
+                    continue
+                full_id = mid if "/" in mid else f"{name}/{mid}"
+                litellm.register_model({full_id: {"supports_function_calling": True, "supports_tool_choice": True}})
+        except Exception:
+            logger.exception("Failed to register tool support for provider %s models", name)
+    except Exception:
+        logger.exception("Failed to register provider entry: %s", provider)
 # TODO: Figure some better placement for this JSON blob
 tools = [
     {
@@ -71,20 +103,17 @@ tools = [
     ]
 
 tavily_client = None
-exa = None
-if api_key := os.getenv("TAVILY_API"):
-    tavily_client = TavilyClient(api_key=api_key)
+
 if api_key := os.getenv("EXA_API"):
     exa = Exa(api_key=api_key)
 
+
+
 def remotewebsearch(query):
-    for fn in random.sample([lambda: tavily_client.search(query) if tavily_client else None,
-                             lambda: asdict(exa.search(query, type="auto")) if exa else None], k=2):
-        try:
-            if result := fn():
-                return result
-        except Exception:
-            continue
+    try: 
+        return asdict(exa.search(query, type="instant"))
+    except Exception as e:
+        print(str(e))
     return "websearch is currently having problems inform user or try later"
    
 
@@ -168,7 +197,12 @@ async def harness(history, model, session, chat_id=None):
             if msg.get("role") == "assistant" and "reasoning_content" not in msg:
                 msg["reasoning_content"] = ""
         logger.debug("harness round starting (model=%s, messages=%d)", model, len(messages))
-        response = await acompletion(model, messages, tools=session_tools, stream=True, num_retries=3, extra_headers=go_headers)
+        try:
+            response = await acompletion(model, messages, tools=session_tools, stream=True, num_retries=3, extra_headers=go_headers)
+        except Exception as e:
+            logger.exception("acompletion failed (model=%s)", model)
+            yield json.dumps({"error": str(e), "type": type(e).__name__}) + "\n"
+            raise
         chunks = []
 
         #
@@ -185,6 +219,10 @@ async def harness(history, model, session, chat_id=None):
                 chunks.append(chunk)
                 yield chunk["choices"][0]["delta"].model_dump_json() + "\n"
         except Timeout:
+            raise
+        except Exception as e:
+            logger.exception("stream failed (model=%s)", model)
+            yield json.dumps({"error": str(e), "type": type(e).__name__}) + "\n"
             raise
 
 

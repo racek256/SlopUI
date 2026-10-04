@@ -42,7 +42,13 @@ async def sendMessage(data: MessageData, conn = Depends(get_conn), user_id = Dep
     # Create Generation 
     GENERATIONS[str(data.chat_id)] = Generation(data.chat_id, "running")
     # Start generation
-    asyncio.create_task(run_generation(GENERATIONS[str(data.chat_id)], conn, user_id, data.chat_id, data.content, data.model, mcp, data.files))
+    task = asyncio.create_task(run_generation(GENERATIONS[str(data.chat_id)], conn, user_id, data.chat_id, data.content, data.model, mcp, data.files))
+    def _log_task_done(t: asyncio.Task):
+        try:
+            t.result()
+        except Exception:
+            logger.exception("run_generation failed (chat_id=%s)", data.chat_id)
+    task.add_done_callback(_log_task_done)
     return JSONResponse(content={"gen_id":data.chat_id}, status_code=200)
 
 @router.post("/get_stream", response_class=StreamingResponse)

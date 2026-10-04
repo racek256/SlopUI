@@ -1,5 +1,9 @@
 import asyncio
+import json
+import logging
 from dataclasses import dataclass, field
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class Generation:
@@ -17,7 +21,7 @@ def publish(gen, event):
 
 DONE = object()
 
-async def event_stream(gen):
+async def event_stream(gen, timeout: float = 120.0):
     q = asyncio.Queue()
     events_so_far = list(gen.events)
     gen.subscribers.add(q)
@@ -25,7 +29,12 @@ async def event_stream(gen):
         for e in events_so_far:
             yield e 
         while True:
-            e = await q.get()
+            try:
+                e = await asyncio.wait_for(q.get(), timeout=timeout)
+            except asyncio.TimeoutError:
+                logger.warning("event_stream timeout (chat_id=%s, status=%s)", gen.chat_id, gen.status)
+                yield json.dumps({"error": "stream timeout: no events from generation", "type": "StreamTimeout"}) + "\n"
+                break
             if e is DONE:
                 break
             yield e 

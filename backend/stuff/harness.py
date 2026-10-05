@@ -111,7 +111,11 @@ if api_key := os.getenv("EXA_API"):
 
 def remotewebsearch(query):
     try: 
-        return asdict(exa.search(query, type="instant"))
+        return asdict(exa.search(query, type="auto", contents={
+            "highlights": True,
+            },
+            num_results=5
+            ))
     except Exception as e:
         print(str(e))
     return "websearch is currently having problems inform user or try later"

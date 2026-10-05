@@ -32,8 +32,8 @@ export default function Login({ finishLogin }) {
 
 	return (
 		<div>
-			<div className="absolute z-101 w-screen  h-screen inset-0 bg-black/30 backdrop-blur-sm" />
-			<div className="absolute top-1/2 left-1/2 shadow-lg bg-secondary text-text border-accent min-w-92 max-w-md  w-3/9 h-max -translate-x-1/2 -translate-y-1/2  z-101 rounded-xl flex flex-col items-center px-2 py-4 border">
+			<div className="fixed z-110 w-screen  h-screen inset-0 bg-black/10 backdrop-blur-sm" />
+			<div className="absolute top-1/2 left-1/2 shadow-lg bg-secondary text-text border-accent min-w-92 max-w-md  w-3/9 h-max -translate-x-1/2 -translate-y-1/2  z-110 rounded-xl flex flex-col items-center px-2 py-4 border">
 				<Logo className="shadow rounded-xl w-full " />
 				<div className="flex h-12 w-full mt-4">
 					<div className={`flex justify-center items-center shadow grow h-full rounded-l-lg select-none cursor-pointer ${!signup && "bg-[#e1e1e1] text-black"}`} onClick={() => { switchsignup(false) }}>Sign in</div>

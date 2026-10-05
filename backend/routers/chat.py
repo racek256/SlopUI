@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from fastapi import  Depends, HTTPException, APIRouter, Response
 from stuff.chat import chat, run_generation
 from DB.connection import get_conn
-from stuff.chatUtils import RenameChat, GetChat, GetChats, CreateChat
+from stuff.chatUtils import RenameChat, GetChat, GetChats, CreateChat, togglePin
 from stuff.configUtils import listModels, checkModel
 from deps import get_mcp
 from stuff.MCP.mcp_manager import SessionManager
@@ -131,3 +131,17 @@ def loadChat(chat_id:int, conn = Depends(get_conn), user_id= Depends(authenticat
         raise HTTPException(status_code=500, detail="internal server error")
 
 
+class chatData(BaseModel):
+    chat_id: str
+
+@router.post("/pin")
+def toggleChat(data:chatData, conn = Depends(get_conn), user_id= Depends(authenticate)):
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="unauthorized")
+    try:
+        togglePin(conn, data.chat_id,user_id)
+    except Exception as e:
+        print(str(e))
+        raise HTTPException(status_code=500, detail="internal server error")
+    
+    

@@ -43,7 +43,7 @@ def LoginUser(conn, username, password):
     hash = row["password_hash"]
     if not bcrypt.checkpw(bytes,hash):
         raise Error("Incorrect password", "auth_failure")
-    encoded = genToken(username, row["user_id"])
+    encoded = genToken(username, row["id"])
     return encoded
 
 def VerifyToken(token):

@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS chats (
 	user_id INTEGER NOT NULL,
 	name TEXT,
 	last_model TEXT,
+	last_used TEXT DEFAULT 'unknown',
+	pinned INTEGER NOT NULL DEFAULT 0,
 	current_message_id INTEGER,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );

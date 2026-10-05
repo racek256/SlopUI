@@ -120,6 +120,9 @@ async def chat(conn,user_id, chat_id, content, model, mcp, files):
         if type(item) != str:
             response = item
             last_message = InsertMessage(conn, user_id, chat_id, "assistant", response["content"], json.dumps(response["chain"]))
+            # update chat timestamp
+            cursor.execute("update chats set last_used = datetime('now') WHERE id = ?", (chat_id,))
+            conn.commit()
             yield json.dumps({
             "chat_id":chat_id
             })

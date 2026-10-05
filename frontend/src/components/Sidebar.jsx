@@ -1,13 +1,31 @@
 import Edit from '../Assets/edit.svg?react'
+import Pin from '../Assets/pin.svg?react'
+import Unpin from '../Assets/unpin.svg?react'
 import Search from '../Assets/search.svg?react'
 import Menu from '../Assets/menu.svg?react'
 import Logo from '../Assets/logo.svg?react'
 import { useState, useEffect, useRef } from 'react'
 
-export default function Sidebar({ search, chats, loadChat, newChat }) {
+export default function Sidebar({ search, chats, loadChat, newChat, loadChats }) {
 	const [expanded, setExpanded] = useState(false)
 	console.log(chats)
 	const ref = useRef()
+
+
+
+
+
+
+	async function pinChat(chat_id) {
+		await fetch("/api/chat/pin", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({
+				chat_id: chat_id.toString()
+			})
+		})
+		loadChats()
+	}
 
 	useEffect(() => {
 		function handleClick(e) {
@@ -22,14 +40,14 @@ export default function Sidebar({ search, chats, loadChat, newChat }) {
 	})
 	return (
 		<>
-			<div className='absolute cursor-pointer z-120 sm:hidden p-2' onClick={() => {
+			<div className='absolute cursor-pointer z-110 sm:hidden p-2' onClick={() => {
 				setExpanded(!expanded)
 			}}>
 				<Menu fill="black" className="shrink-0 size-8 cursor-pointer"
 				/>
 			</div>
 
-			<div ref={ref} className='relative z-99 shrink-0 '>
+			<div ref={ref} className='relative z-110 shrink-0 '>
 				<section className={`bg-secondary text-text w-69 h-dvh overflow-hidden  flex flex-col items-center inset-y-1 fixed transition-all ${expanded ? "translate-x-0" : "-translate-x-full sm:translate-x-0"} sm:static`}>
 					{/* Heading */}
 					<Logo className="w-61 h-14 mt-3 mb-1 " />
@@ -55,7 +73,20 @@ export default function Sidebar({ search, chats, loadChat, newChat }) {
 
 					<section className='flex flex-col mt-2 w-full px-1 h-full overflow-y-auto'> {/* Chats */}
 						{chats.map((e, i) => (
-							<div className='w-full p-1 px-4 py-2  hover:bg-hover transition-none  cursor-pointer  rounded-sm  ' key={i} onClick={() => { loadChat(e.id); setExpanded(false) }}>{e.name}</div>
+							<div className='w-full group p-1 px-4 py-2  hover:bg-hover transition-none  cursor-pointer  rounded-sm  flex space-between justify-between'
+								key={i} onClick={() => { loadChat(e.id); setExpanded(false) }}>
+								<p>{e.name}</p>
+								{!e.pinned ?
+								<Pin onClick={a => {
+									a.stopPropagation()
+									
+									pinChat(e.id)
+
+								}} className="group-hover:opacity-50 opacity-0  rounded-md hover:bg-secondary  transition-colors" />	: <Unpin className="opacity-50 hover:bg-secondary rounded-md transition-colors" onClick={a=>{	
+									a.stopPropagation()
+									pinChat(e.id)
+								}} />}
+									</div>
 						))}
 					</section>
 				</section>

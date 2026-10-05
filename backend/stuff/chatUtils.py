@@ -1,3 +1,4 @@
+from logging import exception
 from stuff.files import file_processor
 import json
 class Error(Exception):
@@ -85,14 +86,29 @@ def GetChat(conn, user_id, chat_id):
 
 def GetChats(conn, user_id, limit=10):
     cursor = conn.cursor()
-    chats = cursor.execute("select * from chats where user_id = ? order by id desc limit ? ", (user_id, limit)).fetchall()
+    chats = cursor.execute("select * from chats where user_id = ? and last_used != 'unknown' order by  pinned desc, last_used desc limit ? ", (user_id, limit)).fetchall()
+
     chatsStruct = []
     for chat in chats:
         chatsStruct.append({
             "name":chat["name"] or "new chat",
+            "pinned":chat["pinned"],
             "id":chat["id"]
             })
     return chatsStruct
+
+def togglePin(conn, chat_id, user_id):
+    cursor = conn.cursor()
+    row = cursor.execute("select user_id,pinned from chats where id = ?",(chat_id,)).fetchone();
+    if row["user_id"] != user_id:
+        raise Exception("kaboom you are not the user");
+    invert = 1 - row["pinned"]
+    cursor.execute("update chats set pinned = ? where id = ?",(invert, chat_id))
+    # cursor.execute("update chats set last_used = datetime('now') WHERE id = ?", (chat_id,))
+    conn.commit()
+
+
+
 
 def DeleteChat(conn, user_id, chat_id):
     cursor = conn.cursor()

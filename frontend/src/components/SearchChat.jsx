@@ -18,6 +18,7 @@ export default function SearchChat({remove, chats, loadChat}){
 		function handleClick(e){
 			if(!node.contains(e.target)){
 				// clicked outside
+				e.stopPropagation()
 				removeRef.current?.()
 			}
 		}
@@ -27,13 +28,13 @@ export default function SearchChat({remove, chats, loadChat}){
 
 
 	return(
-			<motion.div ref={ref} className="bg-secondary border text-text border-accent   shadow-card shadow-accent absolute   w-1/4 h-92 rounded-2xl top-1/2 left-1/2 z-10000 -translate-x-1/2 -translate-y-1/2 flex-col flex"
+			<motion.div ref={ref} className="bg-secondary min-w-72 border text-text border-accent   shadow-card shadow-accent absolute   w-1/4 h-92 rounded-2xl top-1/2 left-1/2 z-10000 -translate-x-1/2  -translate-y-1/2 flex-col flex"
 			initial={{opacity:0,y:10}}
 			animate={{opacity:1,y:0}}
 			exit={{opacity:0, y:10}}>
 				<div className="flex h-12 p-2">	
 					<Search className="h-full w-12 fill-text"/>	
-					<input autoFocus value={query} onChange={e=>{
+					<input  value={query} onChange={e=>{
 						setQuery(e.target.value)
 					}}  className="grow h-full  text-xl" placeholder="Search"/>
 					<Close className="h-full w-8 transition-all cursor-pointer hover:bg-hover fill-text rounded-md" onClick={()=>{remove()}}/>

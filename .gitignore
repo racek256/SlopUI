@@ -181,3 +181,14 @@ ENV/
 *.db
 *.config.yml
 *.config.yaml
+
+# Android signing – NEVER commit
+*.keystore
+*.jks
+.keystore-password
+# TWA build outputs
+twa/.gradle/
+twa/app/build/
+twa/*.apk
+twa/*.aab
+twa/*.idsig

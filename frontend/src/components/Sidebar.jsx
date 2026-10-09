@@ -31,6 +31,7 @@ export default function Sidebar({ search, chats, loadChat, newChat, loadChats })
 		function handleClick(e) {
 			if (!ref.current?.contains(e.target)) {
 				// clicked outside
+			 	e.stopPropagation()
 				setExpanded(false)
 			}
 		}
@@ -43,7 +44,7 @@ export default function Sidebar({ search, chats, loadChat, newChat, loadChats })
 			<div className='absolute cursor-pointer z-110 sm:hidden p-2' onClick={() => {
 				setExpanded(!expanded)
 			}}>
-				<Menu fill="black" className="shrink-0 size-8 cursor-pointer"
+				<Menu  className="shrink-0 fill-text size-8 cursor-pointer"
 				/>
 			</div>
 

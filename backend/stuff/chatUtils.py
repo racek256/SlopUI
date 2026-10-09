@@ -11,7 +11,7 @@ class Error(Exception):
 def CreateChat(conn, user_id, chatName=None):
     cursor = conn.cursor()
     if chatName:
-        cursor.execute("insert into chats (user_id, name) values (?,?)",(user_id,chatName))
+        cursor.execute("insert into chats (user_id, name, last_used) values (?,?, datetime('now'))",(user_id,chatName))
     else:
         cursor.execute("insert into chats (user_id) values (?)",(user_id,))
     chat_id = cursor.lastrowid

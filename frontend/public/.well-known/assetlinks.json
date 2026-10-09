@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "xyz.racek.dev.twa",
+      "sha256_cert_fingerprints": [
+        "2E:51:03:57:B1:A0:56:34:F7:3F:53:AD:4F:DF:E0:87:CA:14:7C:47:08:23:45:3B:AD:4C:1B:E8:1F:1F:37:65"
+      ]
+    }
+  }
+]

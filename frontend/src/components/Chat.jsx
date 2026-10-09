@@ -406,7 +406,7 @@ export default function Chat({expanded, setExpanded, chat_id, setChatID}){
 	}
 
 	return(
-		<div className="w-full h-dvh flex-col flex py-4 pb-0 z-100 items-center overflow-hidden">
+		<div className="w-full h-dvh flex-col flex  pb-0 z-100 items-center overflow-hidden">
 			<div ref={chat} className={`w-full ${expanded || history.length>0 ? "sm:h-full" : "sm:h-1/2"} h-full overflow-y-scroll flex flex-col items-center transition-all duration-500 `}>
 				<div className={`min-w-9/16 w-204 max-w-full   py-12   flex flex-col`}>
 					{history.map((e,i)=>(

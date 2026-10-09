@@ -1,5 +1,19 @@
 # Memory system
 
+
+- [ ] Conversation parser 
+    - [x] format conversation
+    - [x] select model
+    - [x] cook up some good prompt
+    - [ ] export data including minified conversation
+- [ ] Architecture readiness
+    - [ ] altered DB tables 
+    - [ ] memory chunk injections  
+    - [ ] RAG search pipeline
+- [ ] memory filter
+    - [ ] prepare all required tools 
+    - [ ] prepare prompt for memory filter
+    - [ ] let him cook
 # conversation parser
 - after conversation with AI sits idle for some time its scanned with conversation parser
 - conversation parser will be super cheap maybe even none reasoning LLM 
@@ -50,5 +64,6 @@
 # additional decisions
 - should main agent have tool for memory lookup or should it be kept to harness?
 - should main agent get tool that allows it to browser other session turns if memory chunk points to it?
+
 
 

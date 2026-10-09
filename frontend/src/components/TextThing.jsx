@@ -70,7 +70,7 @@ export default function TextThing({sendMessage, active, interrupt, expanded, mod
 							))}
 						</div>
 				<textarea autoFocus ref={text}   onKeyDown={e => {
-					if (e.key == "Enter"){
+					if (e.key == "Enter" && !e.shiftKey){
 						e.preventDefault()
 						send()
 					}

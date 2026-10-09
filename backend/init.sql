@@ -25,3 +25,10 @@ CREATE TABLE IF NOT EXISTS messages (
 	files TEXT,
 	FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
 );
+
+create table if not exists memories (
+	id INTEGER PRIMARY KEY,
+	created_time TEXT DEFAULT NULL,
+	content TEXT NOT NULL,
+	embed BLOB NOT NULL
+);

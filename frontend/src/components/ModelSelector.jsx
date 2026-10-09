@@ -37,12 +37,14 @@ export default function ModelSelector({expanded, model, setModel, models}){
 					exit={{opacity:0, y:10}}
 					transition={{duration:0.05}}
 
-					 onClick={e=>{e.stopPropagation()}} className={`bg-secondary border-[#b8c4ff]  overflow-y-scroll border rounded-xl  shadow-card shadow-[#b8c4ff]/20  absolute model-selector-box w-64 sm:w-92 h-72  ${!expanded ? "sm:top-[anchor(bottom)]":"sm:bottom-[anchor(top)]"} bottom-[anchor(top)]  -translate-x-1/2  cursor-auto`} >
+					 onClick={e=>{e.stopPropagation()}} className={`bg-secondary border-accent  overflow-hidden border rounded-xl  shadow-card shadow-accent/20  absolute model-selector-box w-64 sm:w-92 h-72  ${!expanded ? "sm:top-[anchor(bottom)]":"sm:bottom-[anchor(top)]"} bottom-[anchor(top)]  -translate-x-1/2  cursor-auto`} >
 
 					<div  className="flex h-12 p-2 ">	
 						<Search className="h-full w-12 fill-text"/>	
-						<input autoFocus value={query}  className="grow h-full  text-xl" placeholder="Search" onKeyDown={e=>{
-							if(e.key == "Enter"){
+						<input  value={query}  className="grow h-full  text-xl" placeholder="Search" onKeyDown={e=>{
+							print("shift:" + e.shiftKey)
+							print("enter:" + (e.key =="Enter"))
+							if(e.key == "Enter" && !e.shiftKey){
 								console.log("entered")
 								models.map(e=>{
 									if (e.name.toLowerCase().includes(query)){

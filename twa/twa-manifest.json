@@ -1,0 +1,51 @@
+{
+  "packageId": "xyz.racek.dev.twa",
+  "host": "dev.racek.xyz",
+  "name": "SlopUI",
+  "launcherName": "SlopUI",
+  "display": "standalone",
+  "themeColor": "#FCF9F8",
+  "themeColorDark": "#18181B",
+  "navigationColor": "#FCF9F8",
+  "navigationColorDark": "#18181B",
+  "navigationDividerColor": "#FCF9F8",
+  "navigationDividerColorDark": "#18181B",
+  "backgroundColor": "#FCF9F8",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://dev.racek.xyz/pwa/icon-512.png",
+  "maskableIconUrl": "https://dev.racek.xyz/pwa/maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "/home/racek/Projects/SlopUI/twa/android.keystore",
+    "alias": "android"
+  },
+  "appVersionName": "2",
+  "appVersionCode": 2,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://dev.racek.xyz/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://dev.racek.xyz/",
+  "minSdkVersion": 21,
+  "orientation": "default",
+  "fingerprints": [
+    {
+      "sha256Fingerprint": "2E:51:03:57:B1:A0:56:34:F7:3F:53:AD:4F:DF:E0:87:CA:14:7C:47:08:23:45:3B:AD:4C:1B:E8:1F:1F:37:65"
+    }
+  ],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "protocolHandlers": [],
+  "fileHandlers": [],
+  "launchHandlerClientMode": "",
+  "displayOverride": [],
+  "appVersion": "2"
+}

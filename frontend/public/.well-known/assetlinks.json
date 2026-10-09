@@ -8,5 +8,15 @@
         "2E:51:03:57:B1:A0:56:34:F7:3F:53:AD:4F:DF:E0:87:CA:14:7C:47:08:23:45:3B:AD:4C:1B:E8:1F:1F:37:65"
       ]
     }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "xyz.racek.slop.twa",
+      "sha256_cert_fingerprints": [
+        "9B:8A:83:90:CE:6C:E9:46:51:D0:2C:27:04:2C:2A:1B:C9:10:F3:12:C4:8C:74:84:F1:10:C6:4E:E4:86:FD:0D"
+      ]
+    }
   }
 ]

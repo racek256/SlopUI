@@ -49,7 +49,7 @@ export default function Sidebar({ search, chats, loadChat, newChat, loadChats })
 			</div>
 
 			<div ref={ref} className='relative z-110 shrink-0 '>
-				<section className={`bg-secondary text-text w-69 h-dvh overflow-hidden  flex flex-col items-center inset-y-1 fixed transition-all ${expanded ? "translate-x-0" : "-translate-x-full sm:translate-x-0"} sm:static`}>
+				<section className={`bg-background dark:bg-secondary text-text w-69 h-dvh overflow-hidden  flex flex-col items-center inset-y-1 fixed transition-all ${expanded ? "translate-x-0" : "-translate-x-full sm:translate-x-0"} sm:static`}>
 					{/* Heading */}
 					<Logo className="w-61 h-14 mt-3 mb-1 " />
 					{/* separator */}

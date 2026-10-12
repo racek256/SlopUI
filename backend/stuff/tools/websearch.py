@@ -6,8 +6,7 @@ import os
 import httpx
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
-from litellm import embedding, rerank
-from sentence_transformers import CrossEncoder
+from litellm import embedding
 import re
 import asyncio
 
@@ -52,12 +51,69 @@ def batch_embed_inputs(inputs):
     return batches
 
 
+def _embedding_conf():
+    """Resolve embedding config: (baseURL, api_key, model)."""
+    cfg = get_settings().get("embedding", {}) or {}
+    model = cfg.get("model", "perplexity/pplx-embed-v1-0.6b")
+    base_url = cfg.get("baseURL", cfg.get("base_url", "https://openrouter.ai/api/v1"))
+    api_key_env = cfg.get("api_key_env", "EMBEDDING_API_KEY")
+    api_key = os.environ.get(api_key_env, "") if api_key_env else ""
+    if not api_key:
+        raise KeyError(f"embedding api key missing: set {api_key_env} in the environment")
+    return base_url, api_key, model
+
+
+def _reranker_conf():
+    """Resolve reranker config: (baseURL, api_key, model)."""
+    cfg = get_settings().get("reranker", {}) or {}
+    model = cfg.get("model", "rerank-english-v3.0")
+    base_url = cfg.get("baseURL", cfg.get("base_url", "https://api.cohere.com/v1"))
+    api_key_env = cfg.get("api_key_env", "RERANKER_API_KEY")
+    api_key = os.environ.get(api_key_env, "") if api_key_env else ""
+    if not api_key:
+        raise KeyError(f"reranker api key missing: set {api_key_env} in the environment")
+    return base_url, api_key, model
+
+
+def _cohere_rerank(query: str, docs: list, top_n: int | None = None, model: str | None = None) -> list[dict]:
+    """POST to a Cohere-compatible /rerank endpoint. Returns
+    list of {index, relevance_score} sorted by score desc."""
+    base_url, api_key, conf_model = _reranker_conf()
+    model = model or conf_model
+    base = (base_url or "").rstrip("/")
+    if base.endswith("/rerank"):
+        url = base
+    elif base.endswith("/v1"):
+        url = base + "/rerank"
+    else:
+        url = base + "/v1/rerank"
+    payload: dict[str, object] = {
+        "model": model,
+        "query": query,
+        "documents": docs,
+    }
+    if top_n is not None:
+        payload["top_n"] = top_n
+    resp = httpx.post(
+        url,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json=payload,
+        timeout=30,
+    )
+    resp.raise_for_status()
+    results = resp.json()["results"]
+    return sorted(results, key=lambda r: r.get("relevance_score", 0), reverse=True)
+
+
 def _is_token_limit_error(e: Exception) -> bool:
     msg = str(e).lower()
     return ("exceeds maximum" in msg or "maximum is" in msg) and "token" in msg
 
 
-def _embed_batches(model: str, batches):
+def _embed_batches(model: str, batches, api_base=None, api_key=None):
     from litellm.exceptions import BadRequestError
 
     data = []
@@ -68,7 +124,9 @@ def _embed_batches(model: str, batches):
             continue
         try:
             embeds = embedding(
-                model=model,
+                model=f"openai/{model}",
+                api_base=api_base,
+                api_key=api_key,
                 input=batch,
                 num_retries=2,
                 timeout=30,
@@ -176,36 +234,31 @@ def embeddings(query, results, starttime):
     inputs = [_truncate(query, MAX_QUERY_CHARS)] + [
         _truncate(c["content"], MAX_EMBED_CHARS) for c in content
     ]
-    data = _embed_batches(get_settings()["embedding"]["model"], batch_embed_inputs(inputs))
+    emb_base, emb_key, emb_model = _embedding_conf()
+    data = _embed_batches(emb_model, batch_embed_inputs(inputs), api_base=emb_base, api_key=emb_key)
     e_query = data[0]
     content_embeds = data[1:]
 
     query_vec = np.array(e_query["embedding"], dtype=np.float32)
     results_vec = np.array([item["embedding"] for item in content_embeds], dtype=np.float32)
 
-    idx, _ = top_k_similar(query_vec, results_vec, 35)
+    chunks_limit = (get_settings().get("reranker", {}) or {}).get("chunks_limit", 35)
+    idx, _ = top_k_similar(query_vec, results_vec, chunks_limit)
 
-    # embedding narrowed all chunks down to the 35 most similar —
+    # embedding narrowed all chunks down to the chunks_limit most similar —
     # reranker only judges those
     rerank_docs = [content[i] for i in idx]
 
     logger.debug(f"finished embedding in {time.perf_counter()-starttime}, starting reranking")
 
-    if get_settings()["reranker"]["runner"] == "local":
-        # Reranker magic
-        model = CrossEncoder("cross-encoder/ettin-reranker-68m-v1")
-
-        
-        scores = model.predict([(query, doc["content"]) for doc in rerank_docs])
-    else:
-        results = rerank_openrouter(
-            query=query,
-            documents=[doc["content"] for doc in rerank_docs],
-        )
-        # results: list of {index, relevance_score}, sorted by score desc
-        scores = [None] * len(rerank_docs)
-        for r in results:
-            scores[r["index"]] = r["relevance_score"]
+    results = _cohere_rerank(
+        query=query,
+        docs=[doc["content"] for doc in rerank_docs],
+    )
+    # results: list of {index, relevance_score}, sorted by score desc
+    scores = [None] * len(rerank_docs)
+    for r in results:
+        scores[r["index"]] = r["relevance_score"]
     logger.debug(f"finished reranking in {time.perf_counter()-starttime}")
 
     results = []
@@ -295,22 +348,5 @@ def rerank_openrouter(
     top_n: int | None = None,
     model: str | None = None,
 ) -> list[dict]:
-    model = model or get_settings()["reranker"]["model"] 
-    payload: dict[str, object] = {
-        "model": model,
-        "query": query,
-        "documents": documents,
-    }
-    if top_n is not None:
-        payload["top_n"] = top_n
-    resp = httpx.post(
-        "https://openrouter.ai/api/v1/rerank",
-        headers={
-            "Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}",
-            "Content-Type": "application/json",
-        },
-        json=payload,
-        timeout=30,
-    )
-    resp.raise_for_status()
-    return resp.json()["results"]
+    """Backward-compat wrapper over _cohere_rerank."""
+    return _cohere_rerank(query, documents, top_n, model)

@@ -1,4 +1,5 @@
 from logging import exception
+from stuff.memory.memory_engine import search
 from stuff.files import file_processor
 import json
 class Error(Exception):
@@ -18,7 +19,7 @@ def CreateChat(conn, user_id, chatName=None):
     conn.commit()
     return chat_id
 
-def InsertMessage(conn, user_id, chat_id, role, content, chain=None, files=None):
+async def InsertMessage(conn, user_id, chat_id, role, content, chain=None, files=None):
     cursor = conn.cursor()
     chat = cursor.execute("select user_id, current_message_id from chats where id = ?",(chat_id,)).fetchone()
     if not chat: 
@@ -29,7 +30,24 @@ def InsertMessage(conn, user_id, chat_id, role, content, chain=None, files=None)
     json_files = None
     if files:
         json_files = file_processor(files)
-    cursor.execute("insert into messages (chat_id, content, role, parent_message_id, chain, files) values (?,?,?,?,?,?)",(chat_id, content,role, chat["current_message_id"] or None, chain, json_files))
+    memory = []
+    print(role)
+    if role == "user":
+        # run memory scan
+        print(f"starting memory scan with id: {user_id} and query: {content}")
+        try:
+            memory = await search(conn, user_id, content)
+        except Exception:
+            # memory is an enhancement, never a hard dependency of the chat path
+            import logging
+            logging.getLogger(__name__).exception("memory search failed")
+            memory = []
+        print("memory scan finished")
+        print(memory)
+    memory = [el[0] for el in memory]
+
+
+    cursor.execute("insert into messages (chat_id, content, role, parent_message_id, chain, files, memories) values (?,?,?,?,?,?,?)",(chat_id, content,role, chat["current_message_id"] or None, chain, json_files,json.dumps(memory)))
 
        
 

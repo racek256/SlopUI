@@ -11,6 +11,10 @@ class Session:
         self.user_id = user_id
         self.mcp_configs = mcp_configs
         self.sessions: dict[str, MCPsession] = {}
+        self.last_touched: float = asyncio.get_event_loop().time()
+
+    def touch(self):
+        self.last_touched = asyncio.get_event_loop().time()
 
     async def ensure_all(self):
         for name, cfg in self.mcp_configs.items():
@@ -32,7 +36,9 @@ class Session:
                 s = MCPsession(self.user_id, name, cfg["command"], cfg["args"])
                 await s.start()
                 self.sessions[name] = s
+        self.touch()
     def all_tools(self) -> list:
+        self.touch()
         result = []
         for mcp_name, s in self.sessions.items():
             for t in s.tools:
@@ -41,6 +47,7 @@ class Session:
                 result.append(copy_t)
         return result
     async def execute(self, prefixed_name:str, arguments:dict):
+        self.touch()
         for mcp_name, s in self.sessions.items():
             if prefixed_name.startswith(f"{mcp_name}_"):
                 original = prefixed_name[len(mcp_name)+1:]

@@ -6,14 +6,22 @@ search:
   provider: remote # local/remote
   tavily: true/false # if remote
   exa: true/false # if remote
-embedding: # only used when search provider is local
-  runner: remote
-  model: "openrouter/perplexity/pplx-embed-v1-0.6b"
+embedding: # OpenAI-compatible, called via litellm WITHOUT provider-prefix routing
+  baseURL: "https://example.com/v1"
+  api_key_env: "EMBEDDING_API_KEY"
+  model: "example-embed-model"
   search_limit: 20
-reranker: # only used when search provider is local
-  runner: openrouter # currently openrouter is only supported provider 
-  model: "cohere/rerank-4-fast"
+reranker: # any Cohere-compatible /rerank endpoint, called via plain httpx
+  baseURL: "https://example.com/v1"
+  api_key_env: "RERANKER_API_KEY"
+  model: "example-rerank-model"
   chunks_limit: 35 # amount of chunks that can enter reranker (sorted)
+memory: # OpenAI-compatible custom provider, called via litellm with provider-prefix routing
+  provider: example-provider
+  baseURL: "https://example.com/v1" # omit/null when the provider is a LiteLLM builtin
+  api_key_env: "MEMORY_API_KEY" # NAME of the env var holding the key, never the key itself
+  model: "example-provider/example-model" # model id used for parsing/compacting
+  filter_model: "example-provider/example-model" # model used by memory_filter
 models:
   - provider: openrouter
     format: builtin
@@ -28,6 +36,6 @@ MCPS:
   - name: your-favorite-mcp
     command: "/path/to/your/mcp"
     args:
-      - any 
-	  - argument
+      - any
+      - argument
  

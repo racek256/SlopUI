@@ -1,7 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Discord from '../Assets/discord.svg?react'
 import Logo from '../Assets/logo.svg?react'
-import { useRef } from 'react'
 import Cookies from 'js-cookie'
 
 
@@ -36,9 +35,9 @@ export default function Login({ finishLogin }) {
 			<div className="absolute top-1/2 left-1/2 shadow-lg bg-secondary text-text border-accent min-w-92 max-w-md  w-3/9 h-max -translate-x-1/2 -translate-y-1/2  z-110 rounded-xl flex flex-col items-center px-2 py-4 border">
 				<Logo className="shadow rounded-xl w-full " />
 				<div className="flex h-12 w-full mt-4">
-					<div className={`flex justify-center items-center shadow grow h-full rounded-l-lg select-none cursor-pointer ${!signup && "bg-[#e1e1e1] text-black"}`} onClick={() => { switchsignup(false) }}>Sign in</div>
+					<div className={`flex justify-center items-center shadow grow h-full rounded-l-lg select-none cursor-pointer ${!signup && "bg-[#e1e1e1] text-black"}`} onClick={() => { switchsignup(false); setError(null) }}>Sign in</div>
 					<div className="bg-[#00288e] h-full w-4" />
-					<div className={`flex justify-center items-center shadow grow h-full rounded-r-lg select-none cursor-pointer ${signup && "bg-[#e1e1e1] text-black"} `} onClick={() => { switchsignup(true) }}>Sign up</div>
+					<div className={`flex justify-center items-center shadow grow h-full rounded-r-lg select-none cursor-pointer ${signup && "bg-[#e1e1e1] text-black"} `} onClick={() => { switchsignup(true); setError(null) }}>Sign up</div>
 				</div>
 				{(demo && signup) ? <p className="p-6 text-xl">Signup is disabled in demo mode</p> : <div className="flex flex-col w-full">
 					<input ref={username} className="border-[#c1c1c1] border rounded-lg p-2 w-full h-12 mt-4" placeholder='enter username' />
@@ -46,14 +45,27 @@ export default function Login({ finishLogin }) {
 					{error && <p className="self-start py-1 text-red-500 text-bold">{error}</p>}
 					<button className="bg-[#00288e] hover:bg-[#10389e] transition-all cursor-pointer w-full text-white py-2 px-4 rounded-lg mt-2 h-10"
 						onClick={async () => {
-							let success = undefined
+							setError(null)
+							const uname = username.current.value
+							const pwd = password.current.value
 							if (signup) {
-								success = await register(username.current.value, password.current.value)
+								if (pwd.length < 8) {
+									setError("password must be at least 8 characters")
+									return
+								}
+								const result = await register(uname, pwd)
+								if (result.ok) {
+									finishLogin()
+								} else {
+									setError(result.error)
+								}
 							} else {
-								success = await login(username.current.value, password.current.value)
-							}
-							if (success) {
-								finishLogin()
+								const result = await login(uname, pwd)
+								if (result.ok) {
+									finishLogin()
+								} else {
+									setError(result.error)
+								}
 							}
 						}}
 
@@ -66,10 +78,12 @@ export default function Login({ finishLogin }) {
 					discordLogin()
 				}} className='bg-[#626DED] hover:bg-[#4452BB] transition-colors w-full py-2 px-4 text-center rounded-lg cursor-pointer  text-xl text-white h-10'><p className='flex items-center justify-center gap-2 h-full'>continue with <Discord className="h-6 w-auto aspect-606/122 shrink-0" /></p></div>}
 				{demo && <button className="bg-[#3f6212] hover:bg-[#4d7c0f] transition-all cursor-pointer w-full text-white py-2 px-4 rounded-lg mt-2" onClick={async () => {
-					let success = undefined
-					success = await login("demo", "demo")
-					if (success) {
+					setError(null)
+					const result = await login("demo", "demo")
+					if (result.ok) {
 						finishLogin()
+					} else {
+						setError(result.error)
 					}
 				}}>Skip Login (Demo)</button>}
 			</div>
@@ -80,9 +94,26 @@ export default function Login({ finishLogin }) {
 }
 
 
-async function login(username, password) {
+const REGISTER_ERRORS = {
+	short_password: "password must be at least 8 characters",
+	short_username: "username must be at least 4 characters",
+	username_used: "username is already taken",
+}
+
+async function readErrorMessage(res, fallback) {
 	try {
-		const data = await fetch(`/api/auth/login`, {
+		const body = await res.json()
+		const message = body?.error ?? body?.detail ?? fallback
+		return REGISTER_ERRORS[message] ?? message
+	} catch {
+		return fallback
+	}
+}
+
+async function login(username, password) {
+	const fallback = "could not sign in — check username and password"
+	try {
+		const res = await fetch(`/api/auth/login`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -93,19 +124,21 @@ async function login(username, password) {
 			}),
 			credentials: "include"
 		})
-		if (data.ok) {
-			const parsed = await data.json()
+		if (res.ok) {
+			const parsed = await res.json()
 			console.log(parsed)
 			// Update cookie
-			return true
+			return { ok: true }
 		}
+		return { ok: false, error: await readErrorMessage(res, fallback) }
 	} catch {
-		return false
+		return { ok: false, error: fallback }
 	}
 }
 async function register(username, password) {
+	const fallback = "could not create account — please try again"
 	try {
-		const data = await fetch(`/api/auth/register`, {
+		const res = await fetch(`/api/auth/register`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -116,16 +149,17 @@ async function register(username, password) {
 			}),
 			credentials: "include"
 		})
-		if (data.ok) {
-			const parsed = await data.json()
+		if (res.ok) {
+			const parsed = await res.json()
 			console.log(parsed)
 
 			Cookies.set('token', parsed.token, { expires: 7 * 24 })
-			return true
+			return { ok: true }
 		}
+		return { ok: false, error: await readErrorMessage(res, fallback) }
 	}
 	catch {
-		return false
+		return { ok: false, error: fallback }
 	}
 }
 

@@ -1,11 +1,13 @@
-# Blank file 
+# Blank file
 ## One day this file will contain backend
+import asyncio
 import bcrypt
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 import logging
 import os
-import uvicorn
 import sqlite3
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 load_dotenv('../.env')
@@ -16,18 +18,13 @@ setup_logging()
 
 logger = logging.getLogger(__name__)
 
-from auth.user import CreateUser 
+from auth.user import CreateUser
 from routers.auth import router as auth_router
 from routers.chat import router as chat_router
 
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
-
-
 # MCP stuff
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
 from stuff.MCP.mcp_manager import SessionManager
+from stuff.memory.memory_engine import batch_scan
 
 #MCP_CONFIGS = {
 #    "lightpanda":  {"command": "/home/racek/.local/bin/lightpanda", "args": ["mcp"]},
@@ -35,16 +32,49 @@ from stuff.MCP.mcp_manager import SessionManager
 MCP_CONFIGS = {item["name"]: item for item in get_settings()["MCPS"]}
 
 
+# Schedulers setup
+async def reaper_loop(app: FastAPI, interval_sec: float):
+    while True:
+        try:
+            await asyncio.sleep(interval_sec)
+            count = await app.state.mcp.reap_idle()
+            if count:
+                logger.info("Reaped %d idle MCP sessions", count)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("reaper_loop error")
+
+
+async def memory_loop(interval_sec: float, limit: int):
+    while True:
+        try:
+            await asyncio.sleep(interval_sec)
+            await asyncio.to_thread(batch_scan, limit)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("memory_loop error")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.mcp = SessionManager(MCP_CONFIGS)
-    yield
-    await app.state.mcp.close_all()
-
-
-
+    app.state.mcp = SessionManager(MCP_CONFIGS, idle_timeout=300.0)
+    app.state._jobs = [
+        asyncio.create_task(reaper_loop(app, 60 * 120)),
+        asyncio.create_task(memory_loop(60 * 30, 40)),
+    ]
+    try:
+        yield
+    finally:
+        for job in app.state._jobs:
+            job.cancel()
+        for job in app.state._jobs:
+            try:
+                await job
+            except asyncio.CancelledError:
+                pass
+        await app.state.mcp.close_all()
 
 
 # router stuff
@@ -70,7 +100,7 @@ app.add_middleware(
 
 # main stuff
 def main():
-    conn =initDB()
+    conn = initDB()
     setupDemo(conn)
     conn.close()
     if __name__ == "__main__":
@@ -94,30 +124,21 @@ def initDB():
     conn.commit()
     return conn
 
-# Demo setup 
+# Demo setup
 def setupDemo(conn):
     cursor = conn.cursor()
     demoacc = cursor.execute("select * from users where username = 'demo'").fetchone()
-    if (get_settings()["app"]["demo_mode"] == "true"): 
+    if (get_settings()["app"]["demo_mode"] == "true"):
         if demoacc is None:
             bytes = "demo".encode('utf-8')
             salt = bcrypt.gensalt()
-            hash = bcrypt.hashpw(bytes,salt)
-            cursor.execute("insert into users (username, password_hash) values (?,?)", ("demo", hash)) 
+            hash = bcrypt.hashpw(bytes, salt)
+            cursor.execute("insert into users (username, password_hash) values (?,?)", ("demo", hash))
             conn.commit()
     else:
         if demoacc is not None:
-            cursor.execute("delete from users where id = ?",(demoacc["id"],))
+            cursor.execute("delete from users where id = ?", (demoacc["id"],))
             conn.commit()
 
-    conn.close()
 
-
-        
-            
-
-
-
-
-    
 main()

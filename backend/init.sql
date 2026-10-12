@@ -13,11 +13,14 @@ CREATE TABLE IF NOT EXISTS chats (
 	last_used TEXT DEFAULT 'unknown',
 	pinned INTEGER NOT NULL DEFAULT 0,
 	current_message_id INTEGER,
+	memorized INTEGER,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
 CREATE TABLE IF NOT EXISTS messages ( 
 	id INTEGER PRIMARY KEY, 
 	chat_id INTEGER NOT NULL,
+	memories TEXT,
 	content TEXT, 
 	chain TEXT,
 	role TEXT NOT NULL,
@@ -28,7 +31,9 @@ CREATE TABLE IF NOT EXISTS messages (
 
 create table if not exists memories (
 	id INTEGER PRIMARY KEY,
-	created_time TEXT DEFAULT NULL,
+	local_id INTEGER,
+	user_id INTEGER,
 	content TEXT NOT NULL,
-	embed BLOB NOT NULL
+	embed BLOB NOT NULL,
+	foreign key (user_id) references users(id) on delete cascade
 );

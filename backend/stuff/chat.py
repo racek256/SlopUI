@@ -10,6 +10,7 @@ from stuff.files import text_files_injector, image_request_builder
 
 logger = logging.getLogger(__name__)
 
+# Separate generation manager
 async def run_generation(gen, conn,user_id, chat_id, content, model, mcp, files):
     conn = sqlite3.connect("db.db", check_same_thread=False)
     conn.row_factory = sqlite3.Row
@@ -29,16 +30,14 @@ async def run_generation(gen, conn,user_id, chat_id, content, model, mcp, files)
                 
                 
 
-
+# Main chat constructor
 async def chat(conn,user_id, chat_id, content, model, mcp, files):
     cursor = conn.cursor()
 
-
-    
-    
+ 
     chat = None
     if(chat_id):
-        # Verify chat existence
+        # Verify chats existence
         chat = cursor.execute("select * from chats where id = ?",(chat_id,)).fetchone()
         if chat["current_message_id"] is None:
             RenameChat(conn, user_id, chat_id, title(content))
@@ -46,7 +45,6 @@ async def chat(conn,user_id, chat_id, content, model, mcp, files):
         chat_id = CreateChat(conn, user_id, title(content)) 
         # calling title function here is slow and unefficent should instead start async job that renames chat later 
         chat = cursor.execute("select * from chats where id = ?",(chat_id,)).fetchone()
-
     try:
         cursor.execute("update users set last_model = ? where id = ?", (model, user_id))
         cursor.execute("update chats set last_model = ? where user_id = ? and id = ?", (model, user_id, chat_id))
@@ -57,14 +55,12 @@ async def chat(conn,user_id, chat_id, content, model, mcp, files):
     last_message = None
     if content != "[REGEN_USER_MESSAGE]":
         # Insert user message
-        last_message = InsertMessage(conn, user_id, chat_id, "user", content, None, files)
+        last_message = await InsertMessage(conn, user_id, chat_id, "user", content, None, files)
     else:
         query = cursor.execute("select id from messages where chat_id = ? order by id desc limit 1", (chat_id,)).fetchone()
         last_message = query["id"]
 
-    # Load chat messages
-    if chat is None:
-        logger.warning("nope replace with error later")
+    # Fetch all messages
     messages = cursor.execute("select * from messages where chat_id = ?",(chat_id,)).fetchall()
     # Rebuilding chat array
 
@@ -81,10 +77,20 @@ async def chat(conn,user_id, chat_id, content, model, mcp, files):
                 else:
                     user_content = message["content"]
                     files = json.loads(message["files"]) if message["files"] else []
+                    memories = json.loads(message["memories"])
 
                     if files:
                         print(files)
                         user_content += text_files_injector(files)
+                    if memories:
+                        # Prepare memory injection
+                        placeholders = ', '.join('?' for _ in memories) 
+                        memory = cursor.execute(f"select * from memories where user_id = ? and local_id in ({placeholders})", [user_id]+memories).fetchall()
+                        memory_part = [k["content"]+"\n" for k in memory]
+                        injection = f"""\n<memory_engine>\n{memory_part}\n</memory_engine>"""
+                        user_content += injection
+
+
 
                     history.append({
                         "role":"user",
@@ -119,8 +125,8 @@ async def chat(conn,user_id, chat_id, content, model, mcp, files):
     async for item in harness(history, model, session, chat_id):
         if type(item) != str:
             response = item
-            last_message = InsertMessage(conn, user_id, chat_id, "assistant", response["content"], json.dumps(response["chain"]))
-            # update chat timestamp
+            last_message = await InsertMessage(conn, user_id, chat_id, "assistant", response["content"], json.dumps(response["chain"]))
+                        # update chat timestamp
             cursor.execute("update chats set last_used = datetime('now') WHERE id = ?", (chat_id,))
             conn.commit()
             yield json.dumps({

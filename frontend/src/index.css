@@ -17,7 +17,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-	@theme {
+	:root {
 	  --color-background: var(--color-zinc-900);
 	  --color-secondary: var(--color-neutral-800);
       --color-button: var(--color-zinc-700);

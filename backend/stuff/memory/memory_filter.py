@@ -1,5 +1,43 @@
 import litellm
 import json
+import os
+from stuff.settings import get_settings
+
+
+def _memory_conf():
+    """Resolve memory provider config with safe fallbacks (never crashes on missing section)."""
+    try:
+        cfg = get_settings().get("memory", {}) or {}
+    except Exception:
+        cfg = {}
+    base_url = cfg.get("baseURL", cfg.get("base_url"))
+    model = cfg.get("model")
+    return {
+        "provider": cfg.get("provider"),
+        "base_url": base_url,
+        "api_key_env": cfg.get("api_key_env"),
+        "model": model,
+        "filter_model": cfg.get("filter_model", model),
+    }
+
+
+def _register_memory_provider():
+    conf = _memory_conf()
+    provider = conf.get("provider")
+    base_url = conf.get("base_url")
+    api_key_env = conf.get("api_key_env")
+    if not provider or not base_url:
+        # Builtin LiteLLM provider: no registry entry needed; credentials
+        # from api_key_env are passed explicitly in filter().
+        return
+    from litellm.llms.openai_like.json_loader import JSONProviderRegistry, SimpleProviderConfig
+    JSONProviderRegistry._providers[provider] = SimpleProviderConfig(
+        provider,
+        {
+            "base_url": base_url,
+            "api_key_env": api_key_env or "",
+        },
+    )
 SystemPrompt = """You are memory filter system 
 your job is to take existing memory + new memory and cleanup/manage/edit memory to stay efficent and unbloated
 
@@ -40,7 +78,33 @@ keep memory under 100 memory chunks if it ever reaches such a high amount do dra
 - you filter out unneeded information
 - feel free to reformulate edit or remove even existing memory chunks
 
+
+# Lookup roles ( list of rules to ensure memories usable for future lookup)
+- Never rely on a brand/model/project name alone to say what something is. ( MOST IMPORTANT RULE!!! )
+
+- ONE topic per chunk. Never mix unrelated facts. Merge only chunks about the same thing. 
+- Start with the subject in plain everyday words, then details:
+  "User's laptop is a ThinkPad L480 ...", "User's home server runs ...",
+  "User's diet: vegetarian since 2024 ...", "User's school: ...".
+- Use the common word AND the specific name: "laptop (ThinkPad L480)",
+  "note-taking app Obsidian", "chat server Matrix Synapse".
+- 1-3 sentences, under ~60 words. If it needs more, it is two topics.
+- Write in English, even if the conversation was in Czech. Keep Czech proper
+  nouns (Kounicova, maturita) as they are.
+- Keep durable facts: who the user is, what they own, use, study, build,
+  prefer, can't do (allergies, diet, disabilities), and their ongoing goals.
+- Drop transient details: exact package/BIOS versions, one-off errors that
+  were already solved, prices on a given day, what the assistant suggested
+  unless the user adopted it.
+- If a new fact updates an old one, EDIT the old chunk (don't add a second
+  chunk about the same thing). If it contradicts it, keep only the newer fact.
+- Before adding, check whether a chunk about that subject already exists;
+  if yes, edit it instead.
+
+
+- If you notice problems with existing memories feel free to edit them to follow all rules your job is not only to manage new entries but also old and existing ones
 """
+
 
 
 tools = [
@@ -124,6 +188,7 @@ class memory:
             for chunk in self.memory:
                 if chunk["id"] == args["id"]:
                     chunk["content"] = args["content"]
+                    chunk["updated"] = True
                     break
         else:
             return f"chunk with id: {args["id"]} was not found"
@@ -135,8 +200,17 @@ class memory:
         go_headers = {"x-opencode-session": str("kfjdlshefjdaj"), "User-Agent": "SlopUI/1.0"}
         history = self.construct_conv()
         chain = []
+        conf = _memory_conf()
+        _api_key_env = conf.get("api_key_env")
+        _api_key = os.environ.get(_api_key_env) if _api_key_env else None
+        _api_base = conf.get("base_url")
+        _kwargs = {}
+        if _api_key:
+            _kwargs["api_key"] = _api_key
+        if _api_base:
+            _kwargs["api_base"] = _api_base
         while True:
-            response = litellm.completion(self.model, history+chain, tools=tools, extra_headers=go_headers)
+            response = litellm.completion(self.model, history+chain, tools=tools, extra_headers=go_headers, **_kwargs)
             message = response.choices[0].message 
             chain.append(message.model_dump(exclude_none=True))
             if message.tool_calls:
@@ -175,91 +249,19 @@ class memory:
             "content":userPrompt
             })
         return history
+   
+
 
 
 
         
-conversations = json.dumps("""{"type": "json_object", "messages": [{"turn": "user", "compaction": "nonsense", "memory": ""}, {"turn": "assistant", "compaction": "asked what to reason about", "memory": ""}, {"turn": "user", "compaction": "nonsense", "memory": ""}, {"turn": "assistant", "compaction": "acknowledged", "memory": ""}, {"turn": "user", "compaction": "asked what matrix multiplication is", "memory": ""}, {"turn": "assistant", "compaction": "explained matrix multiplication: row-column dot product rule, dimension match, non-commutativity, linear transformation composition", "memory": ""}]}
-[{"turn":"user","compaction":"Question about matrix multiplication","memory":""},{"turn":"assistant","compaction":"Explained matrix multiplication","memory":""},{"turn":"user","compaction":"Asked to research freqtrade efficiency","memory":"User interested in freqtrade efficiency"},{"turn":"assistant","compaction":"Researched freqtrade efficiency","memory":""}]
-[{
-    "turn": "user",
-    "compaction": "Asked to investigate benchmarks of space-bunny-free and identify the real model behind it",
-    "memory": ""
-},
-{
-    "turn": "assistant",
-    "compaction": "Answered: space-bunny-free is an anonymous stealth model (1M ctx, video input, free), benchmark numbers mostly self-run/mixed, best lead MiniMax M3.1 via tokenizer fingerprint",
-    "memory": "Space Bunny (free) is an anonymous stealth model; tokenizer fingerprinting points to MiniMax family, likely M3.1 — unconfirmed"
-}]
-{"type": "json_object", "messages": [{"turn": "user", "compaction": "Asked why Background React component still has left-to-right scale animation bug despite if-condition; shared code using ResizeObserver + useState number", "memory": "User works on React project with a 'Background' component that uses ResizeObserver and dynamically renders rotated gradient bars based on container width; has an 'expanded' prop toggling bar colors"}, {"turn": "assistant", "compaction": "Explained ResizeObserver fires per-frame during gradual width changes causing staggered bar appends (the wipe effect); gave 3 fixes: debounce updates, fixed bar pool sized once, or CSS repeating-linear-gradient; noted pitch is 60px not 56px and contentRect deprecated", "memory": ""}]}
-[{"turn":"user","compaction":"Asked to convert alpha hex value to number (from #EA580C80)","memory":""},{"turn":"assistant","compaction":"Converted alpha 80 hex to 128/255 = 0.502 (~50%); gave rgba equivalents and JS formula","memory":""}]
-[{"turn":"user","compaction":"Greeting","memory":""},{"turn":"assistant","compaction":"Greeted back, asked what user is doing","memory":""}]
-[{
-    "turn": "user",
-    "compaction": "Asked what LangSmith is",
-    "memory": ""
-},
-{
-    "turn": "assistant",
-    "compaction": "Explained LangSmith: LangChain's tracing/eval/prompt-manage/deploy platform, framework-agnostic, pricing tiers",
-    "memory": ""
-}]
-{"messages":[{"turn":"user","compaction":"asks when Spider-Man Brand New Day releases online","memory":"User follows Spider-Man: Brand New Day release info"},{"turn":"assistant","compaction":"gave theatrical/PVOD/Netflix dates, unconfirmed by Sony","memory":"Brand New Day: theaters Jul 31 2026, PVOD ~Oct 6 2026, Netflix ~late Nov 2026"},{"turn":"user","compaction":"asks if PVOD release gets torrented same day","memory":"User interested in torrent/pirate availability of movies"},{"turn":"assistant","compaction":"explained piracy release stages CAM to WEB to remux","memory":""},{"turn":"user","compaction":"asks if physical release already torrented","memory":""},{"turn":"assistant","compaction":"explained disc is pre-order only, placeholder date","memory":"Brand New Day physical release tentative Nov 17 2026"},{"turn":"user","compaction":"asks when next multiverse Spider-Man comes","memory":""},{"turn":"assistant","compaction":"answered Beyond the Spider-Verse June 18 2027 plus other Spidey projects","memory":"Spider-Man: Beyond the Spider-Verse releases June 18 2027"},{"turn":"user","compaction":"asks what Spider-Noir is and who made it","memory":""},{"turn":"assistant","compaction":"explained Spider-Noir: Sony/Amazon series, Cage, May 2026, canceled after 1 season","memory":"Spider-Noir: Sony/Amazon series with Nicolas Cage, released May 2026, canceled after one season"}]}
-[{
-    "turn": "user",
-    "compaction": "Question about Epic Games Linux dev status",
-    "memory": "User interested in Epic Games Linux development"
-},
-{
-    "turn": "assistant",
-    "compaction": "Answered Epic Games Linux status: native client soon, EAC user-space, Fortnite denied, Rocket League works",
-    "memory": ""
-},
-{
-    "turn": "user",
-    "compaction": "Questioned Linux anti-cheat kernel absence, mentions DKMS",
-    "memory": "User has knowledge of Linux kernel modules and DKMS"
-},
-{
-    "turn": "assistant",
-    "compaction": "Explained Linux kernel anti-cheat barriers: DKMS needs source, no universal signing, GPL taint, user is root; eBPF/attestation paths",
-    "memory": ""
-},
-{
-    "turn": "user",
-    "compaction": "Asked who develops EAC",
-    "memory": ""
-},
-{
-    "turn": "assistant",
-    "compaction": "Answered EAC ownership: Epic Games since 2018, originally Finnish devs, renamed Kamu",
-    "memory": ""
-}]
-[{
-    "turn": "user",
-    "compaction": "Asked if freqtrade strategies need scrapers",
-    "memory": ""
-},
-{
-    "turn": "assistant",
-    "compaction": "Explained scrapers only needed for data outside exchange API, via informative_pairs/FreqAI/confirm_trade_entry; warned about lookahead bias in backtests",
-    "memory": ""
-}]
-1350""")
 
+from litellm.llms.openai_like.json_loader import JSONProviderRegistry  # noqa: F401 (re-export for existing importers)
+import logging as _logging
 
-from litellm.llms.openai_like.json_loader import JSONProviderRegistry, SimpleProviderConfig
+try:
+    _register_memory_provider()
+except Exception:
+    _logging.getLogger(__name__).exception("memory provider registration failed")
 
-JSONProviderRegistry._providers["opencode-go"] = SimpleProviderConfig(
-    "opencode-go",
-    {
-        "base_url": "https://opencode.ai/zen/go/v1",
-        "api_key_env": "OPENCODE_GO_API_KEY",
-    },
-)
-
-
-#memory_chunks = []
-#local_memory = memory(memory_chunks, conversations, "opencode-go/deepseek-v4-flash")
-#print(local_memory.filter())
 

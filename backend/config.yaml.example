@@ -1,11 +1,12 @@
 app:
   demo_mode: false # allows creating temp accounts
+  account_creation: true # allow public signup — turn off to close registration
   log_level: info
   search_provider: remote # local|remote
-search: 
+search:
   provider: remote # local/remote
-  tavily: true/false # if remote
-  exa: true/false # if remote
+  tavily: enabled # if remote
+  exa: enabled # if remote
 embedding: # OpenAI-compatible, called via litellm WITHOUT provider-prefix routing
   baseURL: "https://example.com/v1"
   api_key_env: "EMBEDDING_API_KEY"

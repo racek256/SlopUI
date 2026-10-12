@@ -69,8 +69,6 @@ The search pipeline for memory is really similar to the websearch pipeline:
 
 ---
 
-## Credits
-
 ### Stuff used
 - [LiteLLM](https://github.com/BerriAI/litellm) 
 - [SearXNG](https://github.com/searxng/searxng) 

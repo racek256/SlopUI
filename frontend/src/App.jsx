@@ -93,7 +93,7 @@ function App() {
 			  <Chat expanded={expanded} setExpanded={setExpanded} chat_id={chat_id} setChatID={setChatId}/> 
 	  					<AnimatePresence>	  
 						  {search && <SearchChat chats={chats} loadChat={(i)=>setChatId(i)} remove={()=>{setSearch(false)}}/>}
-						</AnimatePresence>;
+						</AnimatePresence>
 			</section>
 
 		</div>

@@ -1,7 +1,15 @@
 import litellm
 import json
+import logging
 import os
 from stuff.settings import get_settings
+
+logger = logging.getLogger(__name__)
+
+# The filter is a tool-calling loop against a model we do not control; cap it
+# and bound each request so a stuck model cannot hang the scan forever.
+MAX_FILTER_ITERS = 25
+FILTER_REQUEST_TIMEOUT = 120
 
 
 def _memory_conf():
@@ -200,6 +208,7 @@ class memory:
         go_headers = {"x-opencode-session": str("kfjdlshefjdaj"), "User-Agent": "SlopUI/1.0"}
         history = self.construct_conv()
         chain = []
+        iters = 0
         conf = _memory_conf()
         _api_key_env = conf.get("api_key_env")
         _api_key = os.environ.get(_api_key_env) if _api_key_env else None
@@ -210,7 +219,13 @@ class memory:
         if _api_base:
             _kwargs["api_base"] = _api_base
         while True:
-            response = litellm.completion(self.model, history+chain, tools=tools, extra_headers=go_headers, **_kwargs)
+            iters += 1
+            if iters > MAX_FILTER_ITERS:
+                logger.warning("memory filter hit iteration cap (%d) for model %s, stopping",
+                               MAX_FILTER_ITERS, self.model)
+                break
+            response = litellm.completion(self.model, history+chain, tools=tools, extra_headers=go_headers,
+                                          timeout=FILTER_REQUEST_TIMEOUT, **_kwargs)
             message = response.choices[0].message 
             chain.append(message.model_dump(exclude_none=True))
             if message.tool_calls:

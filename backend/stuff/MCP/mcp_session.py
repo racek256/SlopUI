@@ -1,5 +1,6 @@
 import asyncio 
 import os
+import time
 from contextlib import AsyncExitStack
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -17,8 +18,13 @@ class MCPsession:
         self.session = None
         self.tools = None
         self.last_used = 0
+        # Task that entered the AsyncExitStack; only it may exit the stack.
+        self._owner = None
 
     async def start(self):
+        # enter_async_context opens anyio task groups: remember the task so
+        # close() can never exit the stack from a different one.
+        self._owner = asyncio.current_task()
         self._stack = AsyncExitStack()
 
         read, write = await self._stack.enter_async_context(
@@ -31,12 +37,16 @@ class MCPsession:
         self.tools = await experimental_mcp_client.load_mcp_tools(
                 session=self.session, format="openai"
                 )
-        self.last_used = asyncio.get_running_loop().time()
+        self.last_used = time.monotonic()
     async def close (self):
         if self._stack is not None:
+            # Exiting a scope from another task spins anyio's cancellation
+            # delivery forever, so refuse loudly instead.
+            assert asyncio.current_task() is self._owner, (
+                "MCPsession.close() must run in the task that opened it"
+            )
             await self._stack.aclose()
             self._stack = None
             self.session = None
             self.tools = None
-
 

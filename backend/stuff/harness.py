@@ -19,6 +19,13 @@ litellm.suppress_debug_info = True
 
 logger = logging.getLogger(__name__)
 
+# Loop guards: these bound a single exchange so a misbehaving provider or a
+# tool-calling loop cannot pin a worker forever.
+MAX_TOOL_ROUNDS = 50
+MAX_COMPLETION_TOKENS = 16384
+STREAM_CHUNK_TIMEOUT = 15.0
+MAX_TOOL_RESULT_CHARS = 20_000
+
 
 
 
@@ -182,10 +189,19 @@ you call tools yourself, as many as you need, across multiple rounds in a single
 
     
 
+def _truncate_tool_result(payload: str) -> str:
+    """Cap a tool result so one huge page cannot blow up the context/DB row."""
+    if len(payload) <= MAX_TOOL_RESULT_CHARS:
+        return payload
+    logger.warning("tool result truncated from %d to %d chars", len(payload), MAX_TOOL_RESULT_CHARS)
+    return payload[:MAX_TOOL_RESULT_CHARS] + "[...truncated...]"
+
+
 async def harness(history, model, session, chat_id=None):
     # main harness loop
     chain = []
     active = True
+    rounds = 0
 
 
     # include MCP tools
@@ -196,13 +212,19 @@ async def harness(history, model, session, chat_id=None):
     else:
         go_headers = {}
     while active:
+        rounds += 1
+        if rounds > MAX_TOOL_ROUNDS:
+            logger.warning("tool round cap (%d) reached (model=%s, chat_id=%s), answering with partial chain",
+                           MAX_TOOL_ROUNDS, model, chat_id)
+            break
         messages = [{"role":"system", "content":system_prompt}] + history + chain
         for msg in messages:
             if msg.get("role") == "assistant" and "reasoning_content" not in msg:
                 msg["reasoning_content"] = ""
         logger.debug("harness round starting (model=%s, messages=%d)", model, len(messages))
         try:
-            response = await acompletion(model, messages, tools=session_tools, stream=True, num_retries=3, extra_headers=go_headers)
+            response = await acompletion(model, messages, tools=session_tools, stream=True, num_retries=3,
+                                         extra_headers=go_headers, max_tokens=MAX_COMPLETION_TOKENS)
         except Exception as e:
             logger.exception("acompletion failed (model=%s)", model)
             yield json.dumps({"error": str(e), "type": type(e).__name__}) + "\n"
@@ -213,8 +235,7 @@ async def harness(history, model, session, chat_id=None):
         try:
             while True:
                 try:
-                    #chunk = await asyncio.wait_for(response.__anext__(), timeout=15.0)
-                    chunk = await response.__anext__()
+                    chunk = await asyncio.wait_for(response.__anext__(), timeout=STREAM_CHUNK_TIMEOUT)
                 except StopAsyncIteration:
                     break
                 except asyncio.TimeoutError:
@@ -257,21 +278,26 @@ async def harness(history, model, session, chat_id=None):
                             else:
                                 data = "called tool does not exist"
 
-                    chain.append({"role":"tool", "tool_call_id":tool.id, "content": json.dumps(data, ensure_ascii=False)})
+                    chain.append({"role":"tool", "tool_call_id":tool.id, "content": _truncate_tool_result(json.dumps(data, ensure_ascii=False))})
                 except Exception as e:
                     logger.exception("tool %s failed", tool.function.name)
                     chain.append({"role":"tool", "tool_call_id":tool.id, "content": "Tool call has failed"})
-
-
-
         else:
             active = False
 
     
     logger.info("request finished without errors")
+    # A loop guard can stop right after a tool result, and an assistant message
+    # that only made tool calls has no content: answer with the last thing the
+    # model actually said instead of feeding a tool payload back as the reply.
+    final_content = ""
+    for msg in reversed(chain):
+        if msg.get("role") == "assistant" and msg.get("content"):
+            final_content = msg["content"]
+            break
     yield({
         "chain":chain,
-        "content":chain[-1]["content"]
+        "content":final_content
         })
 
 
@@ -285,8 +311,17 @@ Rules:
 - Never leave it looking cut off mid-word
 """
 
+def _title_conf():
+    """Resolve title model id (configurable, ornith default)."""
+    try:
+        cfg = get_settings().get("title", {}) or {}
+    except Exception:
+        cfg = {}
+    return cfg.get("model", "archgigganigga/ornith")
+
+
 def title(content):
-    response = completion("openrouter/google/gemini-2.5-flash-lite", messages=[{"role":"system", "content":title_prompt},{"role":"user","content":content}]) 
+    response = completion(_title_conf(), messages=[{"role":"system", "content":title_prompt},{"role":"user","content":content}]) 
     return(response.choices[0].message["content"])
 
 

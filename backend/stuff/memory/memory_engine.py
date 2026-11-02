@@ -1,4 +1,5 @@
 import os
+import logging
 import httpx
 import numpy as np
 import litellm
@@ -10,6 +11,16 @@ import sqlite3
 from stuff.memory.memory_filter import memory
 from stuff.memory.conv_parser import parser
 from stuff.settings import get_settings
+
+logger = logging.getLogger(__name__)
+
+# Guard against cyclic / dangling parent_message_id chains: walk at most this
+# many hops and stop on the first repeated id.
+MAX_CHAIN_HOPS = 10_000
+
+
+class CorruptChainError(RuntimeError):
+    """A chat's message parent chain is cyclic, dangling, or empty."""
 
 
 def _embedding_conf():
@@ -95,29 +106,44 @@ def test(conn, chat_id):
 
 
     query = cursor.execute("select id from messages where chat_id = ? order by id desc limit 1", (chat_id,)).fetchone()
+    if query is None:
+        logger.error("chat_id=%s has no messages, skipping", chat_id)
+        raise CorruptChainError(f"chat {chat_id} has no messages")
     last_message = query["id"]
 
     # Start for loop of finding message parent_message_id and store into array 
+    by_id = {message["id"]: message for message in messages}
     history = []
-    found = False 
-    while not found:
-        for message in messages:
-            if message["id"] == last_message:
-                if message["role"] == "assistant":
-                    history.append({
-                        "role":"assistant",
-                        "content":message["content"]
-                        })
-                else:
-                    history.append({
-                        "role":"user",
-                        "content":[{"type":"text", "text":message["content"]}]
-                        })
+    seen = set()
+    hops = 0
+    while True:
+        hops += 1
+        if hops > MAX_CHAIN_HOPS:
+            logger.error("chat_id=%s message chain exceeds %d hops, skipping chat", chat_id, MAX_CHAIN_HOPS)
+            raise CorruptChainError(f"chat {chat_id} message chain exceeds {MAX_CHAIN_HOPS} hops")
+        if last_message in seen:
+            logger.error("chat_id=%s message chain cycles at message %s, skipping chat", chat_id, last_message)
+            raise CorruptChainError(f"chat {chat_id} message chain cycles at {last_message}")
+        seen.add(last_message)
+        message = by_id.get(last_message)
+        if message is None:
+            logger.error("chat_id=%s message chain has dangling parent %r, skipping chat", chat_id, last_message)
+            raise CorruptChainError(f"chat {chat_id} message chain has dangling parent {last_message}")
 
-                if message["parent_message_id"] is not None:
-                    last_message = message["parent_message_id"]
-                else:
-                    found = True
+        if message["role"] == "assistant":
+            history.append({
+                "role":"assistant",
+                "content":message["content"]
+                })
+        else:
+            history.append({
+                "role":"user",
+                "content":[{"type":"text", "text":message["content"]}]
+                })
+
+        if message["parent_message_id"] is None:
+            break
+        last_message = message["parent_message_id"]
 
     # reverse the array 
     history.reverse()
@@ -135,11 +161,19 @@ async def user_run(user_id,limit):
     cursor = conn.cursor()
 
     conversations = []
+    healthy_ids = []
     last_50 = cursor.execute("select id from chats where user_id = ? and (memorized = 0 or memorized is NULL) and name is not null and last_model is not null order by id desc limit ?",(user_id,limit)).fetchall()
     ids = [k[0] for k in last_50]
     for idx, i in enumerate(ids):
         print(f"scanning conversation:{idx + 1}/{len(ids)} (chat_id={i})", flush=True)
-        conversations.append(test(conn, i))
+        try:
+            conversations.append(test(conn, i))
+        except CorruptChainError as e:
+            # Broken/cyclic chain: skip this chat and leave memorized = 0 off
+            # the bulk update so it is retried instead of silently dropped.
+            logger.error("skipping chat_id=%s: corrupt message chain (%s)", i, e)
+            continue
+        healthy_ids.append(i)
     print(conversations)
     ready_convs = []
     for conv in conversations:
@@ -159,10 +193,11 @@ async def user_run(user_id,limit):
         raise KeyError("memory.filter_model missing: set memory.filter_model in config.yaml")
     local_memory = memory(processed_memory, conversations, _filter_model)
     fr_memory = local_memory.filter()
-    # tag chats as memorized
-    placeholders = ', '.join('?' for _ in ids) 
-    cursor.execute(f"update chats set memorized = 1 where id in ({placeholders})", ids)
-    conn.commit()
+    # tag chats as memorized (only chats whose chain we could actually read)
+    if healthy_ids:
+        placeholders = ', '.join('?' for _ in healthy_ids) 
+        cursor.execute(f"update chats set memorized = 1 where id in ({placeholders})", healthy_ids)
+        conn.commit()
     await updater(conn, fr_memory, user_id)
 
 

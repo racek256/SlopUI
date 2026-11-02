@@ -3,6 +3,7 @@ from litellm import experimental_mcp_client
 from types import SimpleNamespace
 import asyncio
 import copy
+import time
 from .mcp_session import MCPsession
 
 class Session:
@@ -11,12 +12,23 @@ class Session:
         self.user_id = user_id
         self.mcp_configs = mcp_configs
         self.sessions: dict[str, MCPsession] = {}
-        self.last_touched: float = asyncio.get_event_loop().time()
+        self.last_touched: float = time.monotonic()
+        # Task that opened the MCP stacks; only it may close them.
+        self._owner = None
 
     def touch(self):
-        self.last_touched = asyncio.get_event_loop().time()
+        self.last_touched = time.monotonic()
+
+    def _assert_owner(self):
+        if self._owner is not None:
+            assert asyncio.current_task() is self._owner, (
+                "Session.close() must run in the task that opened the MCP stacks"
+            )
 
     async def ensure_all(self):
+        # Must run inside the SessionManager owner task: it opens stacks and
+        # may close+reopen a dead one, all of which are task-affine.
+        self._owner = asyncio.current_task()
         for name, cfg in self.mcp_configs.items():
             s = self.sessions.get(name)
             if s is None or s._stack is None or s.session is None:
@@ -75,9 +87,9 @@ class Session:
         raise KeyError(f"No MCP in this session owns tool {prefixed_name}")
 
     async def close(self):
+        self._assert_owner()
         for s in self.sessions.values():
             await s.close()
         self.sessions.clear()
-
 
 

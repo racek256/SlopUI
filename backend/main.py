@@ -37,7 +37,7 @@ async def reaper_loop(app: FastAPI, interval_sec: float):
     while True:
         try:
             await asyncio.sleep(interval_sec)
-            count = await app.state.mcp.reap_idle()
+            count = await app.state.mcp.retire_idle()
             if count:
                 logger.info("Reaped %d idle MCP sessions", count)
         except asyncio.CancelledError:
@@ -60,6 +60,8 @@ async def memory_loop(interval_sec: float, limit: int):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.mcp = SessionManager(MCP_CONFIGS, idle_timeout=300.0)
+    # All MCP stack enter/exit happens in this long-lived owner task.
+    await app.state.mcp.startup()
     app.state._jobs = [
         asyncio.create_task(reaper_loop(app, 60 * 120)),
         asyncio.create_task(memory_loop(60 * 30, 40)),
@@ -74,7 +76,7 @@ async def lifespan(app: FastAPI):
                 await job
             except asyncio.CancelledError:
                 pass
-        await app.state.mcp.close_all()
+        await app.state.mcp.shutdown()
 
 
 # router stuff

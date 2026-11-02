@@ -10,6 +10,10 @@ from stuff.files import text_files_injector, image_request_builder
 
 logger = logging.getLogger(__name__)
 
+# Hard cap on how far a parent_message_id walk may travel before we give up
+# and answer with the partial history instead of hanging the request.
+MAX_CHAIN_HOPS = 10_000
+
 # Separate generation manager
 async def run_generation(gen, conn,user_id, chat_id, content, model, mcp, files):
     conn = sqlite3.connect("db.db", check_same_thread=False)
@@ -67,39 +71,58 @@ async def chat(conn,user_id, chat_id, content, model, mcp, files):
     # Start for loop of finding message parent_message_id and store into array 
     history = []
     found = False 
+    seen = set()
+    hops = 0
     while not found:
-        for message in messages:
-            if message["id"] == last_message:
-                if message["role"] == "assistant":
-                    chain = json.loads(message["chain"])
-                    chain.reverse()
-                    history += chain
-                else:
-                    user_content = message["content"]
-                    files = json.loads(message["files"]) if message["files"] else []
-                    memories = json.loads(message["memories"])
+        hops += 1
+        if hops > MAX_CHAIN_HOPS:
+            logger.error("message chain for chat_id=%s exceeds %d hops, answering with partial history",
+                         chat_id, MAX_CHAIN_HOPS)
+            break
+        message = None
+        for candidate in messages:
+            if candidate["id"] == last_message:
+                message = candidate
+                break
+        if message is None:
+            logger.error("message chain for chat_id=%s is broken: parent message %r not found, answering with partial history",
+                         chat_id, last_message)
+            break
+        if message["id"] in seen:
+            logger.error("message chain for chat_id=%s has a cycle at message %s, answering with partial history",
+                         chat_id, message["id"])
+            break
+        seen.add(message["id"])
+        if message["role"] == "assistant":
+            chain = json.loads(message["chain"])
+            chain.reverse()
+            history += chain
+        else:
+            user_content = message["content"]
+            files = json.loads(message["files"]) if message["files"] else []
+            memories = json.loads(message["memories"])
 
-                    if files:
-                        print(files)
-                        user_content += text_files_injector(files)
-                    if memories:
-                        # Prepare memory injection
-                        placeholders = ', '.join('?' for _ in memories) 
-                        memory = cursor.execute(f"select * from memories where user_id = ? and local_id in ({placeholders})", [user_id]+memories).fetchall()
-                        memory_part = [k["content"]+"\n" for k in memory]
-                        injection = f"""\n<memory_engine>\n{memory_part}\n</memory_engine>"""
-                        user_content += injection
+            if files:
+                print(files)
+                user_content += text_files_injector(files)
+            if memories:
+                # Prepare memory injection
+                placeholders = ', '.join('?' for _ in memories) 
+                memory = cursor.execute(f"select * from memories where user_id = ? and local_id in ({placeholders})", [user_id]+memories).fetchall()
+                memory_part = [k["content"]+"\n" for k in memory]
+                injection = f"""\n<memory_engine>\n{memory_part}\n</memory_engine>"""
+                user_content += injection
 
 
 
-                    history.append({
-                        "role":"user",
-                        "content":[{"type":"text", "text":user_content}] + image_request_builder(files)
-                        })
-                if message["parent_message_id"] is not None:
-                    last_message = message["parent_message_id"]
-                else:
-                    found = True
+            history.append({
+                "role":"user",
+                "content":[{"type":"text", "text":user_content}] + image_request_builder(files)
+                })
+        if message["parent_message_id"] is not None:
+            last_message = message["parent_message_id"]
+        else:
+            found = True
 
     # reverse the array 
     history.reverse()
@@ -108,10 +131,7 @@ async def chat(conn,user_id, chat_id, content, model, mcp, files):
 
     # prepare MCP harness
 
-    session = await mcp.get(chat_id)
-    if session == None:
-        session = await mcp.create(user_id, chat_id)
-        await session.ensure_all()
+    session = await mcp.ensure_ready(chat_id, user_id)
 
     
     

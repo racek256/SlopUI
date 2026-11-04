@@ -23,7 +23,8 @@ logger = logging.getLogger(__name__)
 # tool-calling loop cannot pin a worker forever.
 MAX_TOOL_ROUNDS = 50
 MAX_COMPLETION_TOKENS = 16384
-STREAM_CHUNK_TIMEOUT = 15.0
+STREAM_CHUNK_TIMEOUT = 30
+FIRST_TOKEN_TIMEOUT = 60.0  # big prompts take long to prefill; first token is no staleness
 MAX_TOOL_RESULT_CHARS = 20_000
 
 
@@ -233,13 +234,17 @@ async def harness(history, model, session, chat_id=None):
 
         #
         try:
+            first = True
             while True:
                 try:
-                    chunk = await asyncio.wait_for(response.__anext__(), timeout=STREAM_CHUNK_TIMEOUT)
+                    timeout = FIRST_TOKEN_TIMEOUT if first else STREAM_CHUNK_TIMEOUT
+                    chunk = await asyncio.wait_for(response.__anext__(), timeout=timeout)
                 except StopAsyncIteration:
                     break
                 except asyncio.TimeoutError:
-                    raise Timeout(message="Stream idle 15s - provider stalled", model=model, llm_provider="opencode-zen")
+                    raise Timeout(message=f"Stream idle {timeout:.0f}s - provider stalled", model=model, llm_provider="opencode-zen")
+                finally:
+                    first = False
 
                 chunks.append(chunk)
                 yield chunk["choices"][0]["delta"].model_dump_json() + "\n"

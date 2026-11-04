@@ -23,7 +23,7 @@ from routers.auth import router as auth_router
 from routers.chat import router as chat_router
 
 # MCP stuff
-from stuff.MCP.mcp_manager import SessionManager
+from stuff.MCP.mcp_manager import SessionManager, HOME_PROBE_INTERVAL
 from stuff.memory.memory_engine import batch_scan
 
 #MCP_CONFIGS = {
@@ -46,6 +46,19 @@ async def reaper_loop(app: FastAPI, interval_sec: float):
             logger.exception("reaper_loop error")
 
 
+async def mcp_watch_loop(app: FastAPI, interval_sec: float):
+    # Noop-probe the MCP home thread; 3 consecutive failures rebuild it so a
+    # wedged MCP loop can never burn CPU for longer than ~a probe interval.
+    while True:
+        try:
+            await asyncio.sleep(interval_sec)
+            await app.state.mcp.health_check()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("mcp_watch_loop error")
+
+
 async def memory_loop(interval_sec: float, limit: int):
     while True:
         try:
@@ -64,6 +77,7 @@ async def lifespan(app: FastAPI):
     await app.state.mcp.startup()
     app.state._jobs = [
         asyncio.create_task(reaper_loop(app, 60 * 120)),
+        asyncio.create_task(mcp_watch_loop(app, HOME_PROBE_INTERVAL)),
         asyncio.create_task(memory_loop(60 * 30, 40)),
     ]
     try:

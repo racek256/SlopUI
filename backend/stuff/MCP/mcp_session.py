@@ -1,10 +1,26 @@
-import asyncio 
+import asyncio
 import os
+import shlex
 import time
 from contextlib import AsyncExitStack
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from litellm import experimental_mcp_client
+
+
+def normalize_server_command(command, args) -> tuple[str, list]:
+    """Accept sloppy config shapes: a whole command line in `command`
+    (split it) and a string `args` (shlex it), so a config typo can never
+    fail generation with a pydantic ValidationError."""
+    if isinstance(args, (list, tuple)):
+        argv = [str(a) for a in args]
+    elif args is None:
+        argv = []
+    else:
+        argv = shlex.split(str(args))  # e.g. `args: -mcp` or `args: "mcp -v"`
+    parts = shlex.split(str(command))
+    return parts[0], [*parts[1:], *argv]
+
 
 class MCPsession:
     def __init__(self, user_id: int, mcp_name: str, command: str, args):
@@ -13,6 +29,7 @@ class MCPsession:
         # NOTE: the MCP SDK only inherits a safelist (HOME, PATH, ...) into
         # subprocesses, so pass the full server environ (populated from .env
         # via load_dotenv) through to every MCP server.
+        command, args = normalize_server_command(command, args)
         self.server_params = StdioServerParameters(command=command,args=args,env=dict(os.environ))
         self._stack = None
         self.session = None

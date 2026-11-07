@@ -26,8 +26,11 @@ async def event_stream(gen, timeout: float = 120.0):
     events_so_far = list(gen.events)
     gen.subscribers.add(q)
     try:
+        # Pass all existing events
         for e in events_so_far:
+            # TODO:: merge compatible events
             yield e 
+        # Pass all new events
         while True:
             try:
                 e = await asyncio.wait_for(q.get(), timeout=timeout)

@@ -14,7 +14,7 @@ def CreateChat(conn, user_id, chatName=None):
     if chatName:
         cursor.execute("insert into chats (user_id, name, last_used) values (?,?, datetime('now'))",(user_id,chatName))
     else:
-        cursor.execute("insert into chats (user_id) values (?)",(user_id,))
+        cursor.execute("insert into chats (user_id, last_used) values (?, datetime('now'))",(user_id,))
     chat_id = cursor.lastrowid
     conn.commit()
     return chat_id

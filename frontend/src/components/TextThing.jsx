@@ -74,7 +74,7 @@ export default function TextThing({sendMessage, active, interrupt, expanded, mod
 						e.preventDefault()
 						send()
 					}
-				}} className="w-full z-2 text-text  field-sizing-content max-h-64  resize-none text-2xl   " placeholder="Ask anything" />
+				}} className="w-full z-2 text-text  field-sizing-content max-h-64  resize-none text-2xl   " placeholder="Slop anything" />
 				<div className="flex justify-between items-center h-14 w-full overflow-hidden">
 					{/* Starting part */}
 					<div className="flex min-w-0 flex-1 items-center overflow-hidden">
@@ -89,7 +89,7 @@ export default function TextThing({sendMessage, active, interrupt, expanded, mod
 					<div className=" flex flex-none flex-row-reverse items-center">	
 						<div onClick={()=>{
 							send(true)
-						}} className={`send-btn h-12 w-12   ${!active ? "bg-[#00288e]" : "bg-[#b8c4ff]"}  z-10 cursor-pointer rounded-xl flex items-center justify-center p-3`}>
+						}} className={`send-btn h-12 w-12   ${!active ? "bg-accent" : "bg-accent/50"}  z-10 cursor-pointer rounded-xl flex items-center justify-center p-3`}>
 							{!active ? <Send className="send-icon w-full h-full fill-[#e3e3e3] pointer-events-none" />
 							:  <Stop className="send-icon w-full h-full fill-[#e3e3e3] pointer-events-none"  />
 							}

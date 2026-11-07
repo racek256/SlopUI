@@ -3,6 +3,7 @@ import Close from "../Assets/close.svg?react"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import Reasoning from "./Reasoning"
+import NewReasoning from "./NewReasoning"
 
 
 import { motion } from "framer-motion"
@@ -60,7 +61,8 @@ export default function Message({ message,files }) {
 						delay: 1
 					}}
 				>
-					<Reasoning message={message} />
+					<NewReasoning message={message} />
+					<div className="w-xl"/>
 					<div className={`overflow-hidden   relative  flex prose h-max  transition-all w-full p-0`}>
 						<div>
 							{/*<div className={`w-8 h-8   animate-spin  ${message.content != "" ? "-ml-12" : ""} m-1 transition-all bg-black loading text-base whitespace-pre-wrap`}/>*/}

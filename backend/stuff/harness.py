@@ -326,7 +326,7 @@ def _title_conf():
 
 
 def title(content):
-    response = completion(_title_conf(), messages=[{"role":"system", "content":title_prompt},{"role":"user","content":content}]) 
+    response = completion(_title_conf(), messages=[{"role":"system", "content":title_prompt},{"role":"user","content":content}], reasoning_effort="none", extra_body={"chat_template_kwargs": {"enable_thinking": False}},) 
     return(response.choices[0].message["content"])
 
 

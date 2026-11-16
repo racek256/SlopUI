@@ -1,9 +1,10 @@
-
-import Close from "../Assets/close.svg?react"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import Reasoning from "./Reasoning"
 import NewReasoning from "./NewReasoning"
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import 'katex/dist/katex.min.css'
+import { prepareMarkdown, remarkGuardDollars } from "../markdown"
 
 
 import { motion } from "framer-motion"
@@ -68,8 +69,10 @@ export default function Message({ message,files }) {
 							{/*<div className={`w-8 h-8   animate-spin  ${message.content != "" ? "-ml-12" : ""} m-1 transition-all bg-black loading text-base whitespace-pre-wrap`}/>*/}
 						</div>
 						<div className=" w-full inline p-0 text-content-text dark:prose-invert">
-							<ReactMarkdown remarkPlugins={[remarkGfm]}>
-								{message.content}
+							<ReactMarkdown 
+								remarkPlugins={[remarkGfm, remarkMath, remarkGuardDollars]}
+								rehypePlugins={[[rehypeKatex, {strict:'ignore', output:'htmlAndMathml'}]]}>
+								{prepareMarkdown(message.content)}
 							</ReactMarkdown >
 
 						</div>

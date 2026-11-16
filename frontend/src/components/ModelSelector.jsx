@@ -42,8 +42,8 @@ export default function ModelSelector({expanded, model, setModel, models}){
 					<div  className="flex h-12 p-2 ">	
 						<Search className="h-full w-12 fill-text"/>	
 						<input  value={query}  className="grow h-full  text-xl" placeholder="Search" onKeyDown={e=>{
-							print("shift:" + e.shiftKey)
-							print("enter:" + (e.key =="Enter"))
+							console.log("shift:" + e.shiftKey)
+							console.log("enter:" + (e.key =="Enter"))
 							if(e.key == "Enter" && !e.shiftKey){
 								console.log("entered")
 								models.map(e=>{
@@ -61,12 +61,11 @@ export default function ModelSelector({expanded, model, setModel, models}){
 						<Close className="h-full w-8 transition-all cursor-pointer fill-text hover:bg-[#b8c4ff] rounded-md" onClick={()=>{setDisplay(false)}}/>
 					</div>
 					<div className="px-2 h-full flex-col">	
-						<div className="w-full h-1 bg-[#00288e] rounded-xl"/>
-						<div className="flex-col flex  overflow-y-scroll">
+						<div className="flex-col flex  overflow-y-scroll tinyscroll h-full">
 						{models.map((e,i)=>{
 							if (e.name.toLowerCase().includes(query)){	
 								return(
-								<div key={i} className="w-full cursor-pointer bg-[#b8c4ff]/20 hover:bg-[#b8c4ff]/40 transition-all rounded-lg p-1 my-1" onClick={()=>{
+								<div key={i} className="w-full cursor-pointer bg-background hover:bg-hover/50 text-xl hover:bg-[#b8c4ff]/40 text-text transition-all rounded-lg px-2 py-1 my-1" onClick={()=>{
 									setModel(e)
 									setDisplay(false)
 									setQuery("")

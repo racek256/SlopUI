@@ -4,12 +4,12 @@
 - [x] graphic "strednik is my passion" vpravo nahoře
 - [x] novy reasoning 
 - [ ] light mode — absolutní tweaky
-- [ ] cancel prompt button — v dark modu solidní flashbang
+- [x] cancel prompt button — v dark modu solidní flashbang
 - [ ] modrej devider mezi modelama + search box pro modely v selectoru
 - [ ] "oopsie woopsie something went wrong" dialog je flashbang
 - [ ] evaporuj všechny emoji at all cost
 - [ ] aligni "ask anything" a + (nebo to rovnou zkompaktni a dej vedle sebe)
-- [ ] matchni modré tlačítko send se zbytkem dark modu
+- [x] matchni modré tlačítko send se zbytkem dark modu
 - [ ] funkční mobile aplikace (for the love of god)
 - [ ] lepší model selector
 
@@ -26,4 +26,4 @@
 - [x] přepsat "ask anything" na "slop anything" trust
 
 ## Backend anti-kaboom fixy
-- [ ] funkční cancel conversation
+- [ ] funkční cancel button

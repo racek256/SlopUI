@@ -85,7 +85,7 @@ function App() {
 
 
   return (
-		<div className='flex h-dvh sm:p-0 dark:bg-background'>
+		<div className='flex h-dvh sm:p-0 dark:bg-background overflow-hidden'>
 		  <Sidebar search={()=>{setSearch(true)}} chats={chats} loadChat={(i)=>setChatId(i)} newChat={()=>{setChatId(null)}} loadChats={loadChats}/>
 		  <section className='flex relative justify-center  w-full min-w-0'>
 	  		{loginWindow && <Login finishLogin={()=>{location.reload()}}/>}

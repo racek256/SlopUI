@@ -41,7 +41,11 @@ html {
 
 
 
+.tinyscroll{
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0,0,0,.3) transparent;  
 
+}
 
 body {
   scrollbar-width: thin;
@@ -151,10 +155,12 @@ textarea:focus {
   position: absolute;
   position-anchor: --selector;
 
-  left: anchor(center);
+  left: 50%;
 
   @variant sm {
-    left: anchor(center);
+  position-anchor: --selector;
+  left: anchor(center);
+
   }
 }
 

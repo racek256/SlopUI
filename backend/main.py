@@ -10,6 +10,10 @@ import sqlite3
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 load_dotenv('../.env')
 from stuff.settings import get_settings
 
@@ -95,8 +99,8 @@ async def lifespan(app: FastAPI):
 
 # router stuff
 app = FastAPI(lifespan=lifespan)
-app.include_router(auth_router)
-app.include_router(chat_router)
+app.include_router(auth_router, prefix="/api")
+app.include_router(chat_router, prefix="/api")
 
 
 # cors stuff
@@ -113,6 +117,27 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+
+
+# --- Frontend ---
+STATIC_DIR = Path(__file__).parent / "static"
+
+# Vite puts hashed JS/CSS in /assets
+app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+
+# Everything else: serve a real file if it exists, otherwise index.html
+@app.get("/{full_path:path}")
+def spa(full_path: str):
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404)
+    file = (STATIC_DIR / full_path).resolve()
+    if file.is_file() and STATIC_DIR.resolve() in file.parents:
+        return FileResponse(file)
+    return FileResponse(STATIC_DIR / "index.html")
+
+
 
 # main stuff
 def main():

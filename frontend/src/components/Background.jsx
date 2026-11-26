@@ -1,33 +1,33 @@
-import { useRef, useEffect, useState } from "react"
-export default function Background({expanded}){
-	const [number, setNumber] = useState(0)
-	const items = []
-	for(let i=0; i<number;i++){
-		items.push(0)
-	}
+const STRIPE = 4   // px, stripe thickness
+const PITCH = 60   // px, distance between stripe starts (measured horizontally)
+const TILT = 12    // degrees away from vertical, matches the old rotate-12
 
-	const divRef = useRef()
+// A mask period is measured along the gradient axis, not across the box, so the
+// wanted horizontal pitch has to be projected onto that axis (sin of the angle
+// between the axis and the horizontal).
+const ANGLE = 90 + TILT
+const PERIOD = (PITCH * Math.sin((ANGLE * Math.PI) / 180)).toFixed(3)
 
-	useEffect(() => {
-	  let t
-	  const observer = new ResizeObserver(([entry]) => {
-		const n = Math.round(entry.contentBoxSize[0].inlineSize / 60)
-		if (n <= 0) return
-		clearTimeout(t)
-		t = setTimeout(() => setNumber(n), 120) // or setNumber(prev => n !== prev ? n : prev)
-	  })
-	  observer.observe(divRef.current)
-	  return () => { clearTimeout(t); observer.disconnect() }
-	}, [])
+const STRIPE_MASK =
+	`repeating-linear-gradient(${ANGLE}deg, #000 0 ${STRIPE}px, transparent ${STRIPE}px ${PERIOD}px)`
 
-
-	return(
-		<div ref={divRef} className="overflow-hidden h-full w-full flex shrink-0 absolute z-0 ">
-			{items.map((_,i)=>(
-				<div key={i} className={`h-[101vh] w-1  rotate-12 mr-14 shrink-0  bg-gradient ${expanded ? "bg-gradient-active" : ""}`}>
-				</div>
-			))}
+export default function Background({ expanded }) {
+	// One full-bleed element: the vertical glow gradient is painted on it and a
+	// repeating mask cuts it into tilted stripes. Nothing is measured and no
+	// element count is derived from the viewport, so the pattern covers the box
+	// at every size, zoom level, DPR, orientation and mid-resize frame. The old
+	// `width / 56` bar count could not: it ignored the lean of the rotated bars,
+	// so wide boxes ran out of stripes before the right edge, and rem/vh sizing
+	// drifted with root-font changes and mobile viewport quirks.
+	return (
+		<div
+			aria-hidden="true"
+			className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
+		>
+			<div
+				className={`absolute inset-0 bg-gradient ${expanded ? "bg-gradient-active" : ""}`}
+				style={{ maskImage: STRIPE_MASK, WebkitMaskImage: STRIPE_MASK }}
+			/>
 		</div>
 	)
 }
-

@@ -34,32 +34,42 @@ console.log(message)
 const WINDOW = 2
 const EASE = [0.22, 1, 0.36, 1]
 
+function stepIcon(type = "") {
+	if (type.includes("obscura") || type.includes("lightpanda") || type.includes("webfetch")) return "browsing"
+	if (type.includes("websearch")) return "websearch"
+	return "none"
+}
+
 export default function NewReasoning({ message }) {
-  const chain = message?.reason_chain ?? []
-  if (message?.reason_chain && chain.length==0){
-  	chain.unshift({type:"Waking up"});
-  }
-  const start = Math.max(0, chain.length - WINDOW)
-  const visible = chain.map((e, i) => ({ e, i })).slice(start)
+  const chain = message?.reason_chain
+  // "response" is a marker the stream appends the moment the model starts
+  // writing the answer; it is not a step. Everything before the newest marker
+  // belongs to an older round (already answered), so only the steps after it
+  // are still live — and with the marker itself at the tail nothing is live,
+  // which is what makes the reasoning UI animate away on response writing.
+  const marker = (chain ?? []).findLastIndex((e) => e?.type === "response")
+  const steps = (chain ?? []).slice(marker + 1).filter((e) => e?.type !== "response")
+  // Safety net for streams that never wrote a marker: once there is answer text
+  // there is no live work left to show.
+  const answered = marker === -1 && Boolean(message?.content)
+  // Freshly created assistant message: no steps yet, the model has not spoken.
+  const waking = Array.isArray(chain) && chain.length === 0
+  const count = waking ? 1 : steps.length
+  const visible = waking
+    ? [{ key: "waking", e: { type: "Waking up" }, i: 0 }]
+    : answered
+      ? []
+      : steps.map((e, i) => ({ key: `step-${i}`, e, i })).slice(Math.max(0, steps.length - WINDOW))
 
   return (
     <div className="max-w-xl">
       <AnimatePresence initial={false}>
-        {visible.map(({ e, i }) => {
-			e.icon = e.type
-			if(e?.type?.includes("obscura") || e?.type?.includes("lightpanda") || e?.type?.includes("webfetch")){
-				e.icon="browsing"
-			}else if(e?.type?.includes("websearch")){
-				e.icon="websearch"
-			}else{
-				e.icon="hovno"
-			}
-			
-          const last = i === chain.length - 1
+        {visible.map(({ key, e, i }) => {
+          const last = i === count - 1
           return (
             // OUTER: owns the height animation → does the pushing
             <motion.div
-              key={i}                    // ABSOLUTE index, must be stable
+              key={key}                  // stable per step, never reused by a different step
               className="overflow-hidden"
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
@@ -75,7 +85,7 @@ export default function NewReasoning({ message }) {
               >
                 {e.type === 'reason'
                   ? <ReasoningAction  reasoning={e?.content} finished={!last} last={last} />
-                  : <Action  name={e?.type} last={last} finished={!last} icon={e.icon}/>}
+                  : <Action  name={e?.type} last={last} finished={!last} icon={stepIcon(e?.type)}/>}
               </motion.div>
             </motion.div>
           )
